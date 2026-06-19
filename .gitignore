@@ -1,0 +1,9 @@
+.env
+.env.local
+credentials.json
+secrets/
+node_modules/
+__pycache__/
+dist/
+*.pyc
+.DS_Store
