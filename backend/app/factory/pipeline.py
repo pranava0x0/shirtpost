@@ -1,0 +1,106 @@
+"""The Factory pipeline: invoked on admin submission.
+
+Sequence: build + persist the SVG print file -> Printful mockup -> Printful catalog
+sync -> download mockup -> X.com media upload -> X.com tweet. Each external step
+commits its result as it lands, so a later failure leaves a partial, debuggable
+trail rather than losing everything. Failures are recorded on the Drop (status +
+error) and re-raised — never swallowed.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import requests
+from sqlalchemy.orm import Session
+
+from app.config import Settings, get_settings
+from app.factory.printful import PrintfulClient
+from app.factory.xcom import XClient
+from app.models import Drop, DropStatus, Trend, utcnow
+
+logger = logging.getLogger(__name__)
+
+
+class FactoryError(RuntimeError):
+    pass
+
+
+class FactoryPipeline:
+    def __init__(self, settings: Settings | None = None) -> None:
+        self._settings = settings or get_settings()
+
+    def run(self, session: Session, drop: Drop) -> Drop:
+        trend: Trend = drop.trend
+        drop.status = DropStatus.PROCESSING
+        drop.error = None
+        session.commit()
+
+        try:
+            # 1. Build + host the SVG print file. Printful fetches it by URL.
+            svg = PrintfulClient.build_text_svg(drop.design_copy)
+            artifact = self._write_artifact(drop.id, svg)
+            base = self._settings.printful_print_file_base_url
+            if not base:
+                raise FactoryError(
+                    "PRINTFUL_PRINT_FILE_BASE_URL is not set. Printful must fetch the "
+                    f"print file by public URL. SVG saved to {artifact}; host it and "
+                    "set the base URL to continue."
+                )
+            print_file_url = f"{base.rstrip('/')}/{drop.id}.svg"
+
+            printful = PrintfulClient(self._settings)
+            x = XClient(self._settings)
+
+            # 2. Printful mockup.
+            mockup_url = printful.generate_mockup(print_file_url)
+            drop.printful_mockup_url = mockup_url
+            session.commit()
+
+            # 3. Printful catalog sync.
+            drop.printful_sync_product_id = printful.sync_product(
+                name=f"ShirtPost — {trend.term}",
+                print_file_url=print_file_url,
+                thumbnail_url=mockup_url,
+            )
+            session.commit()
+
+            # 4. X.com: upload mockup (v1.1) then tweet (v2) with the media_id.
+            media_id = x.upload_media(self._download(mockup_url))
+            tweet_id = x.post_tweet(
+                self._broadcast_copy(trend.term, drop.design_copy), media_id=media_id
+            )
+
+            drop.x_tweet_id = tweet_id
+            drop.status = DropStatus.PUBLISHED
+            drop.published_at = utcnow()
+            session.commit()
+            logger.info("drop %s published tweet=%s", drop.id, tweet_id)
+            return drop
+        except Exception as exc:
+            session.rollback()
+            drop.status = DropStatus.FAILED
+            drop.error = str(exc)[:1000]
+            session.commit()
+            logger.exception("drop %s failed: %s", drop.id, exc)
+            raise
+
+    # --- helpers ------------------------------------------------------------
+    def _write_artifact(self, drop_id: int, svg: str) -> Path:
+        out_dir = Path(self._settings.artifacts_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{drop_id}.svg"
+        path.write_text(svg, encoding="utf-8")
+        return path
+
+    def _download(self, url: str) -> bytes:
+        resp = requests.get(
+            url, timeout=60, headers={"User-Agent": self._settings.user_agent}
+        )
+        resp.raise_for_status()
+        return resp.content
+
+    @staticmethod
+    def _broadcast_copy(term: str, design_copy: str) -> str:
+        return f'NEW DROP \U0001f455 "{term}" is live. {design_copy}'[:280]

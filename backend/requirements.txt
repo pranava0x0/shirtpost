@@ -1,0 +1,17 @@
+# Pinned exact (==) per CLAUDE.md supply-chain hardening. Install with:
+#   pip install -r requirements.txt
+# Security note (see security.md): CVE-2026-48710 "BadHost" affects starlette
+# < 1.0.1. The interim mitigation is TrustedHostMiddleware (wired in main.py).
+# Before production, upgrade fastapi+starlette to the BadHost-patched line and
+# confirm the resolved starlette version with `pip show starlette`.
+fastapi==0.115.6
+starlette==0.41.3
+uvicorn[standard]==0.34.0
+sqlalchemy==2.0.36
+pydantic==2.10.4
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+requests==2.32.3
+requests-oauthlib==2.0.0
+beautifulsoup4==4.12.3
+feedparser==6.0.11

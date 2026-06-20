@@ -1,0 +1,40 @@
+# ShirtPost
+
+> ShirtPost is a fast-fashion print-on-demand platform that tracks family-friendly, lighthearted internet trends and publishes text-based merchandise. Phase 1 covers the backend trend radar, a human-in-the-loop admin queue, and an automated Printful + X.com execution pipeline — no public storefront or checkout.
+
+## Architecture
+
+- [CLAUDE.md](CLAUDE.md): Universal development principles this project is built against.
+- [security.md](security.md): Supply-chain advisory sweep log and the mitigations applied.
+- [backlog.md](backlog.md): Deferred ideas and Phase 2+ work, with priorities.
+
+## Scraper Engine (The Radar)
+
+- [config.py](backend/app/config.py): Strict env-validated runtime settings (pydantic-settings).
+- [sources.py](backend/app/radar/sources.py): Text-only feed adapters that HTML-strip every title with BeautifulSoup before storage.
+- [scoring.py](backend/app/radar/scoring.py): Hype Score model — velocity of mentions times volume.
+- [worker.py](backend/app/radar/worker.py): Background poller that upserts trends and recomputes scores per sweep.
+
+## Data Layer
+
+- [models.py](backend/app/models.py): SQLAlchemy ORM models for trends and drops, the single source of truth.
+- [schemas.py](backend/app/schemas.py): Pydantic request/response schemas validated before any DB write.
+- [database.py](backend/app/database.py): Engine and session wiring; FastAPI solely owns the database.
+
+## Integration Services (The Factory)
+
+- [printful.py](backend/app/factory/printful.py): Printful client for SVG text mockups and store catalog sync, with XML-escaped payloads.
+- [xcom.py](backend/app/factory/xcom.py): X.com client — v1.1 media upload then a v2 tweet carrying the media_id.
+- [pipeline.py](backend/app/factory/pipeline.py): Synchronous Factory pipeline invoked on admin submission, recording status and errors on each drop.
+
+## Admin API
+
+- [routes.py](backend/app/api/routes.py): Endpoints to list trends by Hype Score, submit design copy, and list drops.
+- [main.py](backend/app/main.py): FastAPI entrypoint wiring middleware, the API, and the radar lifecycle.
+
+## Studio (Admin Dashboard)
+
+- [page.tsx](frontend/app/page.tsx): Single-page admin UI listing trends by Hype Score with a submit form per trend.
+- [TrendCard.tsx](frontend/components/TrendCard.tsx): Client component for pasting design copy and firing the factory.
+- [api.ts](frontend/lib/api.ts): Typed fetch client for the FastAPI backend (no third-party HTTP deps).
+- [env.ts](frontend/lib/env.ts): Zod-validated client environment configuration.
