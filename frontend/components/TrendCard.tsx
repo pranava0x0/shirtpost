@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { api } from "@/lib/api";
 import type { Drop, DropStatus, Trend } from "@/lib/types";
@@ -12,6 +12,10 @@ const STATUS_STYLES: Record<DropStatus, string> = {
   published: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   failed: "bg-red-500/15 text-red-300 border-red-500/30",
 };
+
+function isInFlight(status: DropStatus | undefined): boolean {
+  return status === "pending" || status === "processing";
+}
 
 function StatusBadge({ status }: { status: DropStatus }) {
   return (
@@ -27,7 +31,36 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   const router = useRouter();
   const [copy, setCopy] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [drop, setDrop] = useState<Drop | null>(latestDrop);
   const [pending, startTransition] = useTransition();
+
+  // Adopt a newer drop coming from the server (e.g. after router.refresh()).
+  useEffect(() => {
+    setDrop(latestDrop);
+  }, [latestDrop]);
+
+  // Poll an in-flight drop until it settles, then refresh server data.
+  useEffect(() => {
+    if (!drop || !isInFlight(drop.status)) return;
+    let active = true;
+    const timer = setInterval(async () => {
+      try {
+        const fresh = await api.getDrop(drop.id);
+        if (!active) return;
+        setDrop(fresh);
+        if (!isInFlight(fresh.status)) {
+          clearInterval(timer);
+          router.refresh();
+        }
+      } catch {
+        // transient — keep polling
+      }
+    }, 2500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [drop, router]);
 
   function submit() {
     const value = copy.trim();
@@ -38,9 +71,9 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
     setError(null);
     startTransition(async () => {
       try {
-        await api.submitDesign(trend.id, value);
+        const created = await api.submitDesign(trend.id, value);
         setCopy("");
-        router.refresh();
+        setDrop(created);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Submission failed.");
       }
@@ -88,20 +121,20 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         >
           {pending ? "Submitting…" : "Submit to Factory"}
         </button>
-        {latestDrop ? <StatusBadge status={latestDrop.status} /> : null}
+        {drop ? <StatusBadge status={drop.status} /> : null}
       </div>
 
       {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
 
-      {latestDrop?.error ? (
+      {drop?.error ? (
         <p className="mt-2 break-words text-xs text-red-400">
-          Last drop error: {latestDrop.error}
+          Last drop error: {drop.error}
         </p>
       ) : null}
 
-      {latestDrop?.x_tweet_id ? (
+      {drop?.x_tweet_id ? (
         <p className="mt-2 text-xs text-emerald-400">
-          Published · tweet {latestDrop.x_tweet_id}
+          Published · tweet {drop.x_tweet_id}
         </p>
       ) : null}
     </li>

@@ -28,8 +28,10 @@ uvicorn app.main:app --reload --port 8000
 
 - `GET /health` — liveness
 - `GET /api/trends?limit=100` — trends sorted by Hype Score
-- `POST /api/trends/{id}/submit` — `{ "design_copy": "..." }`, fires the Factory
+- `POST /api/trends/{id}/submit` — `{ "design_copy": "..." }`, fires the Factory (409 if a drop for that trend is already in flight)
 - `GET /api/drops` — drops, newest first
+- `GET /api/drops/{id}` — one drop (the dashboard polls this while a drop is in flight)
+- `POST /api/radar/sweep` — force an immediate radar sweep (the "Refresh radar" button)
 
 Run tests:
 

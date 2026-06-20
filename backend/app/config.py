@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     )
     google_trends_rss_url: str = "https://trends.google.com/trending/rss?geo=US"
     reddit_rss_url: str = "https://www.reddit.com/r/popular/.rss"
+    # Fetch hygiene for live sources (no effect on the simulated source).
+    radar_min_request_interval_seconds: float = Field(default=1.5, ge=0.0)
+    radar_feed_cache_seconds: int = Field(default=300, ge=0)
+    radar_cache_dir: str = ".cache/radar"
+    radar_max_retries: int = Field(default=2, ge=0)
 
     # --- Printful -----------------------------------------------------------
     printful_api_key: str | None = None

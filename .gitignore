@@ -13,6 +13,7 @@ venv/
 *.egg-info/
 .pytest_cache/
 backend/artifacts/
+.cache/
 *.db
 *.sqlite3
 
@@ -21,6 +22,7 @@ node_modules/
 dist/
 .next/
 out/
+*.tsbuildinfo
 next-env.d.ts.tmp
 
 # OS / editor

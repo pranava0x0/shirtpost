@@ -37,6 +37,22 @@ def list_drops(session: Session = Depends(get_session)) -> list[Drop]:
     return list(session.scalars(select(Drop).order_by(Drop.created_at.desc())).all())
 
 
+@router.get("/drops/{drop_id}", response_model=DropOut)
+def get_drop(drop_id: int, session: Session = Depends(get_session)) -> Drop:
+    drop = session.get(Drop, drop_id)
+    if drop is None:
+        raise HTTPException(status_code=404, detail="drop not found")
+    return drop
+
+
+@router.post("/radar/sweep")
+def trigger_sweep() -> dict[str, int]:
+    """Force an immediate radar sweep instead of waiting for the interval."""
+    from app.radar.worker import run_sweep_once
+
+    return {"touched": run_sweep_once()}
+
+
 def _run_pipeline(drop_id: int) -> None:
     """Background runner. The pipeline records status/error on the Drop itself;
     we log here so a background failure is never silent."""
@@ -61,6 +77,16 @@ def submit_design(
     trend = session.get(Trend, trend_id)
     if trend is None:
         raise HTTPException(status_code=404, detail="trend not found")
+    in_flight = session.scalar(
+        select(Drop).where(
+            Drop.trend_id == trend.id,
+            Drop.status.in_([DropStatus.PENDING, DropStatus.PROCESSING]),
+        )
+    )
+    if in_flight is not None:
+        raise HTTPException(
+            status_code=409, detail="a drop for this trend is already in flight"
+        )
     drop = Drop(trend_id=trend.id, design_copy=body.design_copy, status=DropStatus.PENDING)
     session.add(drop)
     session.commit()

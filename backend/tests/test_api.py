@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
 from app.main import app
-from app.models import Trend, utcnow
+from app.models import Drop, DropStatus, Trend, utcnow
 
 
 def _seed_trend(term: str, hype: float) -> int:
@@ -62,3 +62,35 @@ def test_submit_rejects_empty_copy():
     with TestClient(app) as client:
         resp = client.post(f"/api/trends/{trend_id}/submit", json={"design_copy": ""})
     assert resp.status_code == 422
+
+
+def test_get_drop_by_id_and_404():
+    trend_id = _seed_trend("delulu is the solulu", 200.0)
+    with SessionLocal() as s:
+        drop = Drop(trend_id=trend_id, design_copy="copy", status=DropStatus.PENDING)
+        s.add(drop)
+        s.commit()
+        drop_id = drop.id
+    with TestClient(app) as client:
+        assert client.get(f"/api/drops/{drop_id}").json()["id"] == drop_id
+        assert client.get("/api/drops/424242").status_code == 404
+
+
+def test_duplicate_inflight_submission_409():
+    trend_id = _seed_trend("very mindful very demure", 400.0)
+    # Seed an in-flight drop directly so the guard is exercised deterministically
+    # (avoids racing the background pipeline that would otherwise mark it failed).
+    with SessionLocal() as s:
+        s.add(Drop(trend_id=trend_id, design_copy="x", status=DropStatus.PROCESSING))
+        s.commit()
+    with TestClient(app) as client:
+        resp = client.post(f"/api/trends/{trend_id}/submit", json={"design_copy": "again"})
+    assert resp.status_code == 409
+
+
+def test_manual_sweep_populates_trends():
+    with TestClient(app) as client:
+        resp = client.post("/api/radar/sweep")
+        assert resp.status_code == 200
+        assert resp.json()["touched"] >= 5
+        assert len(client.get("/api/trends").json()) >= 5

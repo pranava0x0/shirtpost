@@ -19,6 +19,8 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   listTrends: () => http<Trend[]>("/trends?limit=100"),
   listDrops: () => http<Drop[]>("/drops"),
+  getDrop: (id: number) => http<Drop>(`/drops/${id}`),
+  triggerSweep: () => http<{ touched: number }>("/radar/sweep", { method: "POST" }),
   submitDesign: (trendId: number, designCopy: string) =>
     http<Drop>(`/trends/${trendId}/submit`, {
       method: "POST",

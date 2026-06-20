@@ -1,3 +1,4 @@
+import { RadarControls } from "@/components/RadarControls";
 import { TrendCard } from "@/components/TrendCard";
 import { api } from "@/lib/api";
 import type { Drop, Trend } from "@/lib/types";
@@ -29,11 +30,14 @@ export default async function AdminPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">ShirtPost Radar</h1>
-        <p className="mt-1 text-sm text-neutral-400">
-          Trending hooks by Hype Score. Paste design copy to fire the factory.
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">ShirtPost Radar</h1>
+          <p className="mt-1 text-sm text-neutral-400">
+            Trending hooks by Hype Score. Paste design copy to fire the factory.
+          </p>
+        </div>
+        <RadarControls />
       </header>
 
       {error ? (

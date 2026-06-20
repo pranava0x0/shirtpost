@@ -27,16 +27,25 @@ The alternatives, if ever needed:
 - **Trend observation history** (priority: medium). Current model stores only latest + prev
   volume per trend. An append-only `trend_observations` table would give true velocity curves
   and charts instead of a single delta.
-- **Lock files / hash-locked installs** (priority: medium). Add `pip-compile --generate-hashes`
-  (or uv lock) for the backend and commit `package-lock.json` for the frontend; install with
-  `pip install --require-hashes` / `npm ci`.
-- **Real source adapters hardening** (priority: medium). Add rate limiting (>=1.5s/host),
-  backoff on 429, and disk caching for Google Trends / Reddit per CLAUDE.md network ethics.
+- **Lock files / hash-locked installs** (priority: medium). The frontend commits
+  `package-lock.json` (CI uses `npm ci`); add `uv lock` / `pip-compile --generate-hashes` for the
+  backend and install with `--require-hashes`.
 - **Pipeline retries + idempotency** (priority: medium). A failed drop should be safely
-  re-runnable without double-posting to X.com (dedup by drop id / store the tweet attempt).
+  re-runnable without double-posting to X.com (dedup by drop id / store the tweet attempt). The
+  409 in-flight guard prevents concurrent double-fires but not retry-after-failure dedup.
+
+## Done (was here, now implemented)
+
+- ~~Real source-adapter hardening~~ — `radar/fetch.py` adds disk caching, per-host rate limiting
+  (>=1.5s), and 429 backoff.
+- ~~X v1.1 media upload~~ — X deprecated v1.1 media on 2025-06-09; the client now targets v2
+  `POST /2/media/upload` with defensive id parsing.
 
 ## Phase 2+
 
 - **Public storefront + checkout** (priority: low for now). Explicitly out of Phase 1 scope.
 - **Auth on the admin dashboard** (priority: high before any non-local deployment). The API is
-  currently open behind CORS + trusted-host only.
+  currently open behind CORS + trusted-host only. Do it properly: route the dashboard's calls
+  through Next.js server-side (Route Handlers / Server Actions) so an `ADMIN_API_TOKEN` lives only
+  on the server, then require it on the FastAPI side — a browser-direct token would be public.
+  Deferred this pass because it's a meaningful refactor and we're not deploying yet.

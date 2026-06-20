@@ -12,10 +12,10 @@ import re
 from dataclasses import dataclass
 
 import feedparser
-import requests
 from bs4 import BeautifulSoup
 
 from app.config import get_settings
+from app.radar import fetch
 
 logger = logging.getLogger(__name__)
 
@@ -37,19 +37,6 @@ def clean_text(value: str) -> str:
     return _WS.sub(" ", text).strip()
 
 
-def _http_get(url: str) -> str | None:
-    settings = get_settings()
-    try:
-        resp = requests.get(
-            url, headers={"User-Agent": settings.user_agent}, timeout=15
-        )
-        resp.raise_for_status()
-        return resp.text
-    except requests.RequestException as exc:  # log and skip, never crash the sweep
-        logger.warning("radar fetch failed url=%s err=%s", url, exc)
-        return None
-
-
 def _parse_volume(entry: object) -> int:
     """Google Trends RSS exposes ht:approx_traffic (e.g. "200,000+"); else 1."""
     approx = entry.get("ht_approx_traffic") if hasattr(entry, "get") else None
@@ -61,7 +48,7 @@ def _parse_volume(entry: object) -> int:
 
 
 def fetch_rss(source_id: str, url: str) -> list[RawTrend]:
-    body = _http_get(url)
+    body = fetch.get(url)
     if body is None:
         return []
     feed = feedparser.parse(body)

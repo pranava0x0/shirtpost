@@ -12,10 +12,20 @@ holds only the initial 4 docs until the PR merges.
 ## Verified (all green, 2026-06-19)
 
 - Frontend: `npm install` (361 pkgs), `tsc --noEmit`, `next build` — all pass.
-- Backend: deps install on CPython 3.12, `pytest` = **16 passed**.
+- Backend: deps install on CPython 3.12, `pytest` = **30 passed**.
 - E2E smoke: radar sweep (simulated source) → 5 trends → `GET /api/trends`
   sorted by Hype Score → `POST submit` creates a drop; Factory **fails loud**
   with the exact missing-config reason and records it on the drop.
+
+## Improvements landed on the PR (second batch)
+
+- **X media → v2** — v1.1 media upload was deprecated 2025-06-09; client now
+  targets `POST /2/media/upload` with defensive id parsing.
+- **Radar network hygiene** — `radar/fetch.py`: disk cache + per-host rate
+  limit (>=1.5s) + 429 backoff.
+- **Closed-loop Studio** — `GET /api/drops/{id}` + dashboard auto-polls
+  in-flight drops; `POST /api/radar/sweep` + a "Refresh radar" button.
+- **Safety** — 409 guard against double-firing a trend with an in-flight drop.
 
 ## Dev environment already provisioned (don't redo)
 

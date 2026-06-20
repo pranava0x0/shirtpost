@@ -1,8 +1,13 @@
 """X.com (Twitter) client.
 
-Flow mandated by the spec: upload the mockup image via the v1.1 media endpoint
-first (OAuth 1.0a user context), then attach the returned ``media_id`` to a v2
-``POST /2/tweets`` call. OAuth 1.0a signing is delegated to ``requests-oauthlib``.
+Flow: upload the mockup image to the media endpoint first (OAuth 1.0a user
+context), then attach the returned ``media_id`` to a v2 ``POST /2/tweets`` call.
+OAuth 1.0a signing is delegated to ``requests-oauthlib``.
+
+NOTE: the spec named the v1.1 media endpoint, but X **deprecated v1.1 media
+upload on 2025-06-09**; the live replacement is v2 ``POST /2/media/upload``. We
+target v2 and parse the id defensively (the response shape shifted across
+releases: ``data.id`` on the new endpoint, ``media_id_string`` on older ones).
 """
 
 from __future__ import annotations
@@ -16,7 +21,7 @@ from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
-X_MEDIA_UPLOAD_URL = "https://upload.twitter.com/1.1/media/upload.json"
+X_MEDIA_UPLOAD_URL = "https://api.twitter.com/2/media/upload"
 X_TWEETS_URL = "https://api.twitter.com/2/tweets"
 
 _REQUIRED = ("x_api_key", "x_api_secret", "x_access_token", "x_access_token_secret")
@@ -39,18 +44,27 @@ class XClient:
         )
         self._ua = settings.user_agent
 
-    def upload_media(self, image_bytes: bytes) -> str:
-        """v1.1 media upload -> media_id_string."""
+    def upload_media(self, image_bytes: bytes, media_category: str = "tweet_image") -> str:
+        """v2 POST /2/media/upload -> media id (parsed defensively)."""
         resp = requests.post(
             X_MEDIA_UPLOAD_URL,
             auth=self._auth,
             files={"media": image_bytes},
+            data={"media_category": media_category},
             headers={"User-Agent": self._ua},
             timeout=60,
         )
         if resp.status_code >= 400:
             raise XError(f"media upload -> {resp.status_code}: {resp.text[:500]}")
-        return str(resp.json()["media_id_string"])
+        body = resp.json()
+        media_id = (
+            (body.get("data") or {}).get("id")
+            or body.get("media_id_string")
+            or body.get("id")
+        )
+        if not media_id:
+            raise XError(f"media upload: no media id in response {body}")
+        return str(media_id)
 
     def post_tweet(self, text: str, media_id: str | None = None) -> str:
         """v2 POST /2/tweets -> tweet id."""
