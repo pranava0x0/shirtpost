@@ -13,7 +13,7 @@
 - [config.py](backend/app/config.py): Strict env-validated runtime settings (pydantic-settings).
 - [sources.py](backend/app/radar/sources.py): Text-only feed adapters that HTML-strip every title with BeautifulSoup before storage.
 - [fetch.py](backend/app/radar/fetch.py): Live-source HTTP with disk caching, per-host rate limiting, and 429 backoff.
-- [scoring.py](backend/app/radar/scoring.py): Hype Score model — velocity of mentions times volume.
+- [scoring.py](backend/app/radar/scoring.py): Hype Score — a volume base with a capped velocity boost, so steady trends never collapse to zero.
 - [worker.py](backend/app/radar/worker.py): Background poller that upserts trends and recomputes scores per sweep.
 
 ## Data Layer

@@ -40,6 +40,8 @@ The alternatives, if ever needed:
   (>=1.5s), and 429 backoff.
 - ~~X v1.1 media upload~~ — X deprecated v1.1 media on 2025-06-09; the client now targets v2
   `POST /2/media/upload` with defensive id parsing.
+- ~~Hype Score collapse~~ — found by running it: `velocity * volume` zeroed every score on the
+  second identical sweep. Rebased on a volume base with a capped velocity boost (`scoring.py`).
 
 ## Phase 2+
 

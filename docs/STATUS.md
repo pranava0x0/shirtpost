@@ -26,6 +26,9 @@ holds only the initial 4 docs until the PR merges.
 - **Closed-loop Studio** — `GET /api/drops/{id}` + dashboard auto-polls
   in-flight drops; `POST /api/radar/sweep` + a "Refresh radar" button.
 - **Safety** — 409 guard against double-firing a trend with an in-flight drop.
+- **Hype Score fix** — found by *running* it: the spec's `velocity × volume`
+  zeroed every score on the second identical sweep. Rebased on a volume base
+  with a capped velocity boost; verified live to hold across re-sweeps.
 
 ## Dev environment already provisioned (don't redo)
 
@@ -62,6 +65,6 @@ npm run dev                                   # http://localhost:3000
 2. **No auth on the admin API** — required before any non-local deploy. [high]
 3. FastAPI/Starlette BadHost upgrade once the patched line resolves
    (TrustedHostMiddleware is the interim mitigation). [high]
-4. Trend observation-history table (current scoring bootstraps first-sight
-   velocity to volume, so first-sweep hype ≈ volume²; ranking is correct,
-   magnitude normalizes on later sweeps). [medium]
+4. Trend observation-history table — the model stores only latest + prev volume
+   per trend; an append-only observations table would give true velocity curves
+   instead of a single delta. [medium]

@@ -22,6 +22,22 @@ def test_velocity_never_negative():
     assert scoring.compute_velocity(300, 100, start, later) == 0.0
 
 
-def test_hype_score_is_velocity_times_volume():
-    assert scoring.hype_score(100.0, 300) == 30000.0
-    assert scoring.hype_score(0.0, 999) == 0.0
+def test_steady_trend_keeps_volume_as_hype():
+    # Regression: a flat trend (zero velocity) must NOT collapse to 0 — that was
+    # the bug found by running the app and re-sweeping.
+    assert scoring.hype_score(0.0, 50_000) == 50_000.0
+
+
+def test_velocity_boosts_score_above_volume():
+    # ratio 0.5 -> 1.5x the volume base
+    assert scoring.hype_score(25_000.0, 50_000) == 75_000.0
+    assert scoring.hype_score(25_000.0, 50_000) > 50_000.0
+
+
+def test_velocity_boost_is_capped():
+    capped = scoring.hype_score(10_000_000.0, 50_000)
+    assert capped == 50_000.0 * (1.0 + scoring.HYPE_VELOCITY_BOOST_CAP)
+
+
+def test_zero_volume_scores_zero():
+    assert scoring.hype_score(123.0, 0) == 0.0
