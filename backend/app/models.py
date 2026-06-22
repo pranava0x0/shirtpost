@@ -16,10 +16,12 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -47,6 +49,9 @@ class Trend(Base):
     term_raw: Mapped[str] = mapped_column(String(512))  # original title, pre-clean
     source: Mapped[str] = mapped_column(String(64), index=True)
     source_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # What `volume` measures for this source (e.g. "search_traffic", "presence",
+    # "seed"). NOT comparable across sources — surfaced so the UI never implies it.
+    measurement: Mapped[str] = mapped_column(String(32), default="unknown")
 
     volume: Mapped[int] = mapped_column(Integer, default=0)  # mentions, latest observation
     prev_volume: Mapped[int] = mapped_column(Integer, default=0)
@@ -63,6 +68,16 @@ class Trend(Base):
 
 class Drop(Base):
     __tablename__ = "drops"
+    __table_args__ = (
+        # DB-level invariant: at most one in-flight (pending/processing) drop per
+        # trend. Makes the 409 guard race-proof rather than check-then-insert.
+        Index(
+            "uq_drop_inflight_per_trend",
+            "trend_id",
+            unique=True,
+            sqlite_where=text("status IN ('pending', 'processing')"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     trend_id: Mapped[int] = mapped_column(
@@ -72,8 +87,12 @@ class Drop(Base):
 
     design_copy: Mapped[str] = mapped_column(Text)  # operator-authored, from their own LLM
 
+    # Store the enum *value* ("pending") not the name, so the partial-index
+    # predicate above matches and the DB/API agree on the string.
     status: Mapped[DropStatus] = mapped_column(
-        Enum(DropStatus), default=DropStatus.PENDING, index=True
+        Enum(DropStatus, values_callable=lambda e: [m.value for m in e], name="dropstatus"),
+        default=DropStatus.PENDING,
+        index=True,
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)  # surfaced, never swallowed
 

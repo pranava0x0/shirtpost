@@ -25,6 +25,27 @@ class PrintfulError(RuntimeError):
     pass
 
 
+def _wrap_words(words: list[str], max_chars: int) -> list[str]:
+    """Greedy word wrap; hard-breaks any single token longer than max_chars."""
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        while len(word) > max_chars:  # break a token too long for one line
+            if current:
+                lines.append(current)
+                current = ""
+            lines.append(word[:max_chars])
+            word = word[max_chars:]
+        if current and len(current) + 1 + len(word) > max_chars:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
 class PrintfulClient:
     def __init__(self, settings: Settings) -> None:
         if not settings.printful_api_key:
@@ -42,37 +63,56 @@ class PrintfulClient:
 
     # --- SVG print-file payload --------------------------------------------
     @staticmethod
-    def build_text_svg(design_copy: str, width: int = 1800, height: int = 2400) -> str:
-        """Center the design copy on a transparent print canvas.
+    def build_text_svg(
+        design_copy: str,
+        width: int = 1800,
+        height: int = 2400,
+        *,
+        margin: int = 150,
+        fill: str = "#FFFFFF",  # white art assumes a DARK garment (default variant is black)
+    ) -> str:
+        """Render design copy centered *inside* the printable area.
 
-        ``xml_escape`` handles ``< > &``; we escape ``"`` and ``'`` explicitly so
-        the text can never break out of an attribute or inject markup.
+        Picks the largest font size at which the wrapped copy fits the canvas on
+        both axes, so even a max-length (500-char) submission stays on the shirt
+        instead of spilling above/below it. Wrapping is done on the raw text and
+        each line is XML-escaped afterward, so an escaped entity (``&lt;`` …) can
+        never be split into invalid markup, and no raw markup can break out.
         """
-        safe = xml_escape(design_copy, {'"': "&quot;", "'": "&apos;"})
+        words = design_copy.split() or [design_copy]
+        avail_w = width - 2 * margin
+        avail_h = height - 2 * margin
 
-        # Naive word-wrap (~18 chars/line) so long copy doesn't overflow the shirt.
-        lines: list[str] = []
-        current = ""
-        for word in safe.split():
-            if current and len(current) + len(word) + 1 > 18:
-                lines.append(current)
-                current = word
-            else:
-                current = f"{current} {word}".strip()
-        if current:
-            lines.append(current)
+        # Largest font (descending) whose wrapped lines fit the box vertically.
+        lines, font_size, line_height = _wrap_words(words, 1), 24, 30.0
+        for fs in range(220, 23, -4):
+            chars_per_line = max(1, int(avail_w / (0.6 * fs)))  # ~0.6em/char, Arial bold
+            wrapped = _wrap_words(words, chars_per_line)
+            lh = fs * 1.25
+            if len(wrapped) * lh <= avail_h:
+                lines, font_size, line_height = wrapped, fs, lh
+                break
+        else:
+            # Still overflows at the min size: keep only the lines that fit.
+            font_size, line_height = 24, 24 * 1.25
+            chars_per_line = max(1, int(avail_w / (0.6 * font_size)))
+            max_lines = max(1, int(avail_h / line_height))
+            lines = _wrap_words(words, chars_per_line)[:max_lines]
 
-        line_height = 180
-        start_y = height // 2 - (len(lines) - 1) * line_height // 2
-        texts = "".join(
-            f'<text x="{width // 2}" y="{start_y + i * line_height}" '
-            f'text-anchor="middle" font-family="Arial, sans-serif" '
-            f'font-weight="700" font-size="160" fill="#FFFFFF">{line}</text>'
-            for i, line in enumerate(lines)
-        )
+        total_h = len(lines) * line_height
+        start_y = (height - total_h) / 2 + font_size  # first baseline, vertically centered
+        parts = []
+        for i, line in enumerate(lines):
+            safe = xml_escape(line, {'"': "&quot;", "'": "&apos;"})
+            y = start_y + i * line_height
+            parts.append(
+                f'<text x="{width // 2}" y="{y:.0f}" text-anchor="middle" '
+                f'font-family="Arial, sans-serif" font-weight="700" '
+                f'font-size="{font_size}" fill="{fill}">{safe}</text>'
+            )
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
-            f'height="{height}" viewBox="0 0 {width} {height}">{texts}</svg>'
+            f'height="{height}" viewBox="0 0 {width} {height}">{"".join(parts)}</svg>'
         )
 
     # --- HTTP helpers -------------------------------------------------------

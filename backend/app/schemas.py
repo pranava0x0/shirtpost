@@ -16,6 +16,7 @@ class TrendOut(BaseModel):
     term: str
     source: str
     source_url: str | None
+    measurement: str
     volume: int
     velocity: float
     hype_score: float

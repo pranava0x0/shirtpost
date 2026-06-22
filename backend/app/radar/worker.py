@@ -40,6 +40,7 @@ def run_sweep_once() -> int:
                             term_raw=item.term_raw,
                             source=item.source,
                             source_url=item.source_url,
+                            measurement=item.measurement,
                             volume=item.volume,
                             prev_volume=0,
                             velocity=velocity,
@@ -56,6 +57,7 @@ def run_sweep_once() -> int:
                     trend.volume = item.volume
                     trend.velocity = velocity
                     trend.hype_score = scoring.hype_score(velocity, item.volume)
+                    trend.measurement = item.measurement
                     trend.last_seen_at = now
                     if item.source_url:
                         trend.source_url = item.source_url

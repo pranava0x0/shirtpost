@@ -93,9 +93,32 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
       </div>
 
       <p className="mt-1 text-xs text-neutral-500">
-        {trend.source} · vol {trend.volume.toLocaleString()} · vel{" "}
+        {trend.source_url ? (
+          <a
+            href={trend.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-neutral-300"
+          >
+            {trend.source}
+          </a>
+        ) : (
+          <span>{trend.source}</span>
+        )}
+        {" · "}
+        {trend.volume.toLocaleString()} {trend.measurement}
+        {" · vel "}
         {trend.velocity.toFixed(1)}/hr
+        {" · seen "}
+        {new Date(`${trend.last_seen_at}Z`).toLocaleString()}
       </p>
+      {!trend.source_url ? (
+        <p className="mt-0.5 text-[11px] text-amber-400/80">
+          {trend.source === "simulated"
+            ? "seed data — not real demand; verify before publishing"
+            : "no source link — verify the trend before publishing"}
+        </p>
+      ) : null}
 
       <div className="mt-3">
         <label htmlFor={`copy-${trend.id}`} className="sr-only">

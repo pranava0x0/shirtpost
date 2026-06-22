@@ -45,6 +45,27 @@ The alternatives, if ever needed:
 - ~~Factory always failed without secrets~~ — added `FACTORY_DRY_RUN` so the loop completes with
   clearly-marked simulated outputs (drops reach `published`); backend serves the generated SVG at
   `/artifacts/<id>.svg`. Real-mode hosting + creds (above) still needed for actual publishing.
+- ~~Duplicate-drop race~~ (PR review) — replaced the check-then-insert 409 with a DB-level partial
+  unique index on `trend_id` while in-flight; the route catches `IntegrityError`. Concurrency test added.
+- ~~Off-canvas shirt art~~ (PR review) — `build_text_svg` now fits the largest font that keeps wrapped
+  copy inside the print area (was unbounded lines → invisible art). Regression test asserts containment.
+- ~~Cross-source volume confusion~~ (PR review) — added a `measurement` field per trend
+  (`search_traffic` / `presence` / `seed`), surfaced in the UI so volumes aren't implied comparable.
+- ~~Missing source trail~~ (PR review) — trend card links `source_url`, shows `last_seen`, and flags
+  seed/no-source data as "verify before publishing".
+- ~~Tweet claimed a non-buyable drop was "live"~~ (PR review) — broadcast copy no longer claims "live";
+  it only links a shop URL when `STORE_BASE_URL` is set, reserving characters for it.
+
+## Open follow-ups from the PR review
+
+- **True cross-source normalization** (priority: medium). The `measurement` field stops the UI from
+  *implying* comparability, but the global queue still ranks all sources by one `hype_score`. Add
+  per-source normalization or separate ranking lanes before mixing real sources.
+- **Storefront URL + conversion path** (priority: high before any real X posting). Phase 1 has no
+  checkout, so the broadcast is a teaser. Wire a real product/store URL + CTA and don't announce a
+  buyable drop until one exists.
+- **Garment-color safety** (priority: low). `build_text_svg` fill defaults to white, which assumes a
+  dark garment (the default variant is black). Tie the print color to the selected variant's color.
 
 ## Phase 2+
 

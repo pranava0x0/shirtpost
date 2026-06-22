@@ -82,9 +82,15 @@ class FactoryPipeline:
             session.commit()
 
             # 4. X.com: upload mockup (v1.1) then tweet (v2) with the media_id.
+            store_base = self._settings.store_base_url
+            product_url = (
+                f"{store_base.rstrip('/')}/{drop.printful_sync_product_id}"
+                if store_base
+                else None
+            )
             media_id = x.upload_media(self._download(mockup_url))
             tweet_id = x.post_tweet(
-                self._broadcast_copy(trend.term, drop.design_copy), media_id=media_id
+                self._broadcast_copy(trend.term, product_url), media_id=media_id
             )
 
             drop.x_tweet_id = tweet_id
@@ -117,5 +123,13 @@ class FactoryPipeline:
         return resp.content
 
     @staticmethod
-    def _broadcast_copy(term: str, design_copy: str) -> str:
-        return f'NEW DROP \U0001f455 "{term}" is live. {design_copy}'[:280]
+    def _broadcast_copy(term: str, product_url: str | None = None) -> str:
+        """Honest broadcast copy. Only claims a buyable drop when a real shop URL
+        exists; reserves room for that URL instead of blindly slicing at 280."""
+        limit = 280
+        if product_url:
+            suffix = f"\nShop: {product_url}"
+            head = f'New ShirtPost drop inspired by "{term}" \U0001f455'
+            return head[: limit - len(suffix)] + suffix
+        # Phase 1: no storefront/checkout — a teaser, not a purchasable "live" drop.
+        return f'Trend spotted: "{term}" — a ShirtPost drop in the works \U0001f440'[:limit]

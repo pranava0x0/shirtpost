@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     # Public base URL of this backend (used to build reachable artifact/mockup URLs).
     public_base_url: str = "http://127.0.0.1:8000"
 
+    # Public storefront base URL. When set, the X broadcast includes a real shop
+    # link ("{store_base}/{sync_product_id}"). Unset (Phase 1, no storefront) =>
+    # the post is a teaser, never a "live"/buyable claim.
+    store_base_url: str | None = None
+
     # --- X.com (OAuth 1.0a user context: required for v1.1 media + v2 tweets) -
     x_api_key: str | None = None
     x_api_secret: str | None = None

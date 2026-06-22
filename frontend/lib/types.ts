@@ -5,6 +5,7 @@ export type Trend = {
   term: string;
   source: string;
   source_url: string | null;
+  measurement: string;
   volume: number;
   velocity: number;
   hype_score: number;

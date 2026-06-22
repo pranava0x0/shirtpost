@@ -1,6 +1,8 @@
 """API smoke tests against the real app via TestClient (Radar disabled)."""
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.database import SessionLocal
 from app.main import app
@@ -94,3 +96,27 @@ def test_manual_sweep_populates_trends():
         assert resp.status_code == 200
         assert resp.json()["touched"] >= 5
         assert len(client.get("/api/trends").json()) >= 5
+
+
+def test_inflight_unique_index_blocks_second_pending():
+    # DB-level invariant (race-proof): a second in-flight drop for the same trend
+    # must be rejected by the constraint, not just the application pre-check.
+    trend_id = _seed_trend("we are so back", 100.0)
+    with SessionLocal() as s:
+        s.add(Drop(trend_id=trend_id, design_copy="a", status=DropStatus.PENDING))
+        s.commit()
+    with SessionLocal() as s:
+        s.add(Drop(trend_id=trend_id, design_copy="b", status=DropStatus.PENDING))
+        with pytest.raises(IntegrityError):
+            s.commit()
+
+
+def test_inflight_index_allows_multiple_terminal_drops():
+    # Terminal drops (failed/published) are not covered by the partial index, so a
+    # trend can accumulate history and be retried after a failure.
+    trend_id = _seed_trend("delulu is the solulu", 100.0)
+    with SessionLocal() as s:
+        s.add(Drop(trend_id=trend_id, design_copy="a", status=DropStatus.FAILED))
+        s.add(Drop(trend_id=trend_id, design_copy="b", status=DropStatus.PUBLISHED))
+        s.commit()  # no IntegrityError
+        assert len(s.query(Drop).filter(Drop.trend_id == trend_id).all()) == 2

@@ -11,6 +11,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal, get_session
@@ -77,6 +78,7 @@ def submit_design(
     trend = session.get(Trend, trend_id)
     if trend is None:
         raise HTTPException(status_code=404, detail="trend not found")
+    # Fast path: friendly 409 without hitting the constraint in the common case.
     in_flight = session.scalar(
         select(Drop).where(
             Drop.trend_id == trend.id,
@@ -89,6 +91,15 @@ def submit_design(
         )
     drop = Drop(trend_id=trend.id, design_copy=body.design_copy, status=DropStatus.PENDING)
     session.add(drop)
+    try:
+        # Authoritative guard: the partial unique index rejects a concurrent
+        # second in-flight drop even if two requests passed the check above.
+        session.flush()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409, detail="a drop for this trend is already in flight"
+        )
     session.commit()
     session.refresh(drop)
     background.add_task(_run_pipeline, drop.id)

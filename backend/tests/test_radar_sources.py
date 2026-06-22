@@ -19,6 +19,7 @@ def test_simulated_source_returns_seeds_with_provenance():
     for row in rows:
         assert row.source == "simulated"
         assert row.term and row.volume > 0
+        assert row.measurement == "seed"  # not comparable to real-source volumes
 
 
 def test_collect_skips_unknown_source_without_crashing():

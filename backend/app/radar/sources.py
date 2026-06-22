@@ -29,6 +29,7 @@ class RawTrend:
     source: str
     source_url: str | None
     volume: int
+    measurement: str  # what `volume` measures; NOT comparable across sources
 
 
 def clean_text(value: str) -> str:
@@ -37,14 +38,16 @@ def clean_text(value: str) -> str:
     return _WS.sub(" ", text).strip()
 
 
-def _parse_volume(entry: object) -> int:
-    """Google Trends RSS exposes ht:approx_traffic (e.g. "200,000+"); else 1."""
+def _parse_volume(entry: object) -> tuple[int, str]:
+    """Return (volume, measurement). Google Trends RSS exposes ht:approx_traffic
+    (e.g. "200,000+") = a search-traffic estimate; otherwise the feed merely
+    listed the item, so volume is a placeholder 1 with measurement "presence"."""
     approx = entry.get("ht_approx_traffic") if hasattr(entry, "get") else None
     if approx:
         digits = re.sub(r"[^\d]", "", str(approx))
         if digits:
-            return int(digits)
-    return 1
+            return int(digits), "search_traffic"
+    return 1, "presence"
 
 
 def fetch_rss(source_id: str, url: str) -> list[RawTrend]:
@@ -58,13 +61,15 @@ def fetch_rss(source_id: str, url: str) -> list[RawTrend]:
         term = clean_text(raw_title)
         if not term:
             continue
+        volume, measurement = _parse_volume(entry)
         out.append(
             RawTrend(
                 term=term,
                 term_raw=raw_title,
                 source=source_id,
                 source_url=getattr(entry, "link", None),
-                volume=_parse_volume(entry),
+                volume=volume,
+                measurement=measurement,
             )
         )
     logger.info("radar source=%s parsed=%d", source_id, len(out))
@@ -83,7 +88,14 @@ _SIMULATED: list[tuple[str, int]] = [
 
 def fetch_simulated(source_id: str = "simulated") -> list[RawTrend]:
     return [
-        RawTrend(term=clean_text(t), term_raw=t, source=source_id, source_url=None, volume=v)
+        RawTrend(
+            term=clean_text(t),
+            term_raw=t,
+            source=source_id,
+            source_url=None,
+            volume=v,
+            measurement="seed",
+        )
         for t, v in _SIMULATED
     ]
 

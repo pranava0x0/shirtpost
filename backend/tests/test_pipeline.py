@@ -37,6 +37,20 @@ def test_dry_run_publishes_without_external_calls():
         assert drop.error is None
 
 
+def test_broadcast_copy_no_storefront_is_not_a_live_claim():
+    txt = FactoryPipeline._broadcast_copy("we are so back")
+    assert "live" not in txt.lower()  # no false "buy it now" implication
+    assert "we are so back" in txt
+    assert len(txt) <= 280
+
+
+def test_broadcast_copy_reserves_room_for_shop_url():
+    url = "https://shop.example.com/" + "p" * 80
+    txt = FactoryPipeline._broadcast_copy("x" * 400, url)
+    assert url in txt  # URL is never truncated away
+    assert len(txt) <= 280
+
+
 def test_real_mode_fails_loud_without_config():
     # Default (dry-run off) with no Printful host/creds must still fail loud.
     with SessionLocal() as session:
