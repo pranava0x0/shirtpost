@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ShirtPost — fast-fashion print-on-demand for internet trends</title>
+<meta name="description" content="ShirtPost tracks family-friendly internet trends and turns them into text merch. Phase 1: the backend Radar, a human-in-the-loop admin Studio, and an automated Printful + X.com Factory." />
+<meta name="theme-color" content="#0a0a0a" />
+<meta name="robots" content="index,follow" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #141414;
+    --panel-2: #1c1c1c;
+    --border: #2a2a2a;
+    --text: #f5f5f5;
+    --muted: #a3a3a3;
+    --faint: #6b6b6b;
+    --accent: #fafafa;
+    --emerald: #34d399;
+    --amber: #fbbf24;
+    --sky: #38bdf8;
+    --radius: 14px;
+    --maxw: 880px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  a:focus-visible, .btn:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; border-radius: 6px; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+
+  header { padding: 64px 0 32px; }
+  .badge {
+    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--emerald);
+    border: 1px solid color-mix(in srgb, var(--emerald) 35%, transparent);
+    background: color-mix(in srgb, var(--emerald) 12%, transparent);
+    padding: 4px 10px; border-radius: 999px;
+  }
+  h1 { font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1.05; letter-spacing: -0.02em; margin: 18px 0 10px; }
+  .lede { color: var(--muted); font-size: clamp(1rem, 2.5vw, 1.2rem); max-width: 60ch; margin: 0 0 24px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 44px;
+    padding: 0 18px; border-radius: 10px; font-weight: 600; text-decoration: none;
+    border: 1px solid var(--border); color: var(--text); background: var(--panel-2);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .btn:hover { border-color: #555; }
+  .btn.primary { background: var(--accent); color: #0a0a0a; border-color: var(--accent); }
+  .btn.primary:hover { background: #fff; }
+
+  section { padding: 28px 0; border-top: 1px solid var(--border); }
+  h2 { font-size: 1.05rem; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: 0 0 18px; font-weight: 700; }
+
+  .pipeline { width: 100%; height: auto; display: block; }
+
+  .cards { display: grid; gap: 14px; grid-template-columns: 1fr; }
+  @media (min-width: 720px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+  .card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .card .kicker { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .card.radar .kicker { color: var(--sky); }
+  .card.studio .kicker { color: var(--amber); }
+  .card.factory .kicker { color: var(--emerald); }
+  .card p { color: var(--muted); font-size: .95rem; margin: 8px 0 0; }
+
+  ul.clean { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  ul.clean li { color: var(--muted); }
+  ul.clean li strong { color: var(--text); font-weight: 600; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; background: var(--panel-2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: #e5e5e5; }
+
+  .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 10px; padding: 14px 16px; color: var(--muted); font-size: .92rem; }
+  .note strong { color: var(--text); }
+
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font-size: .82rem; color: var(--muted); border: 1px solid var(--border); background: var(--panel-2); border-radius: 999px; padding: 5px 12px; }
+
+  footer { padding: 36px 0 64px; color: var(--faint); font-size: .85rem; border-top: 1px solid var(--border); }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge">Phase 1 · shipped</span>
+      <h1>ShirtPost</h1>
+      <p class="lede">Fast-fashion print-on-demand for family-friendly internet trends — <em>“we are so back”</em>, <em>“very mindful very demure”</em>, <em>“delulu is the solulu”</em>. A radar spots the trend, a human approves the copy, the factory makes and announces the merch.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/pranava0x0/shirtpost">View the repo →</a>
+        <a class="btn" href="https://github.com/pranava0x0/shirtpost/blob/main/llms.txt">Architecture map</a>
+        <a class="btn" href="https://github.com/pranava0x0/shirtpost/blob/main/backlog.md">Backlog</a>
+      </div>
+    </header>
+
+    <section aria-label="Pipeline">
+      <h2>The pipeline</h2>
+      <svg class="pipeline" viewBox="0 0 860 150" role="img" aria-label="Flow: the Radar finds trends, the Studio queues operator-approved copy, the Factory builds and broadcasts the drop.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#555" />
+          </marker>
+        </defs>
+        <g font-family="-apple-system, Segoe UI, Roboto, sans-serif">
+          <g>
+            <rect x="8" y="35" width="240" height="80" rx="12" fill="#141414" stroke="#38bdf8" stroke-opacity="0.5"/>
+            <text x="128" y="68" text-anchor="middle" fill="#38bdf8" font-size="13" font-weight="700">RADAR</text>
+            <text x="128" y="90" text-anchor="middle" fill="#a3a3a3" font-size="12">scrape · score · rank</text>
+          </g>
+          <line x1="252" y1="75" x2="300" y2="75" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+          <g>
+            <rect x="310" y="35" width="240" height="80" rx="12" fill="#141414" stroke="#fbbf24" stroke-opacity="0.5"/>
+            <text x="430" y="68" text-anchor="middle" fill="#fbbf24" font-size="13" font-weight="700">STUDIO</text>
+            <text x="430" y="90" text-anchor="middle" fill="#a3a3a3" font-size="12">human approves copy</text>
+          </g>
+          <line x1="554" y1="75" x2="602" y2="75" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+          <g>
+            <rect x="612" y="35" width="240" height="80" rx="12" fill="#141414" stroke="#34d399" stroke-opacity="0.5"/>
+            <text x="732" y="68" text-anchor="middle" fill="#34d399" font-size="13" font-weight="700">FACTORY</text>
+            <text x="732" y="90" text-anchor="middle" fill="#a3a3a3" font-size="12">Printful + X.com</text>
+          </g>
+        </g>
+      </svg>
+    </section>
+
+    <section aria-label="Subsystems">
+      <h2>Three subsystems</h2>
+      <div class="cards">
+        <div class="card radar">
+          <span class="kicker">Radar</span>
+          <h3>Token-efficient scraper</h3>
+          <p>Polls feeds, HTML-strips every title with BeautifulSoup, and ranks by a per-source-normalized Hype Score (volume × velocity boost). Disk-cached, rate-limited, 429 backoff.</p>
+        </div>
+        <div class="card studio">
+          <span class="kicker">Studio</span>
+          <h3>Admin queue</h3>
+          <p>A single-page Next.js dashboard listing trends by Hype Score with the source trail. The operator pastes design copy; submitting fires the factory and the card live-polls to published / failed.</p>
+        </div>
+        <div class="card factory">
+          <span class="kicker">Factory</span>
+          <h3>Make &amp; broadcast</h3>
+          <p>Builds a fit-to-canvas SVG, generates a Printful mockup, syncs the catalog, then posts to X (v2 media + tweet). Fails loud without creds; a dry-run mode completes the loop for demos.</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="Engineering">
+      <h2>Built like it matters</h2>
+      <ul class="clean">
+        <li><strong>Single source of truth.</strong> FastAPI + SQLAlchemy own the database; the dashboard is a thin HTTP client.</li>
+        <li><strong>Race-proof.</strong> A partial unique index enforces one in-flight drop per trend at the DB layer, not just a check.</li>
+        <li><strong>Honest data.</strong> Source provenance, capture dates, a measurement unit per source, and seed data flagged as “not real demand”.</li>
+        <li><strong>Supply-chain hardened.</strong> Pinned versions, advisory-swept dependencies, CI actions pinned to commit SHAs with least-privilege tokens.</li>
+        <li><strong>Tested.</strong> 41 backend tests incl. security regressions; green CI on every push.</li>
+      </ul>
+    </section>
+
+    <section aria-label="Stack">
+      <h2>Stack</h2>
+      <div class="stack">
+        <span class="chip">Python 3.12</span>
+        <span class="chip">FastAPI</span>
+        <span class="chip">SQLAlchemy + SQLite</span>
+        <span class="chip">Pydantic</span>
+        <span class="chip">Next.js 15</span>
+        <span class="chip">TypeScript</span>
+        <span class="chip">Zod</span>
+        <span class="chip">Tailwind</span>
+        <span class="chip">GitHub Actions</span>
+      </div>
+    </section>
+
+    <section aria-label="Status">
+      <h2>What’s here</h2>
+      <p class="note"><strong>This page is documentation, not the app.</strong> ShirtPost is an internal tool — a Python backend plus a server-rendered admin dashboard that needs live Printful/X credentials. It runs locally, not on static hosting. The public storefront and checkout are intentionally out of Phase 1 scope.</p>
+    </section>
+
+    <footer>
+      <p>ShirtPost · Phase 1 · <a href="https://github.com/pranava0x0/shirtpost">github.com/pranava0x0/shirtpost</a></p>
+    </footer>
+  </div>
+</body>
+</html>
