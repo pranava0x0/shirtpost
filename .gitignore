@@ -1,9 +1,29 @@
+# Secrets / env
 .env
-.env.local
+.env.*
+!.env.example
 credentials.json
 secrets/
-node_modules/
+
+# Python
 __pycache__/
-dist/
 *.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+backend/artifacts/
+.cache/
+*.db
+*.sqlite3
+
+# Node / Next.js
+node_modules/
+dist/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts.tmp
+
+# OS / editor
 .DS_Store
