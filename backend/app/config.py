@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # host; the pipeline appends "/<drop_id>.svg". Unset => Factory fails loud.
     printful_print_file_base_url: str | None = None
     artifacts_dir: str = "artifacts"
+    # Dry-run: complete the Factory pipeline without Printful/X (dev/demo). Outputs
+    # are clearly marked simulated. Default off so a real misconfig still fails loud.
+    factory_dry_run: bool = False
+    # Public base URL of this backend (used to build reachable artifact/mockup URLs).
+    public_base_url: str = "http://127.0.0.1:8000"
 
     # --- X.com (OAuth 1.0a user context: required for v1.1 media + v2 tweets) -
     x_api_key: str | None = None

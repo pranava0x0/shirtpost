@@ -132,9 +132,23 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         </p>
       ) : null}
 
-      {drop?.x_tweet_id ? (
+      {drop?.status === "published" ? (
         <p className="mt-2 text-xs text-emerald-400">
-          Published · tweet {drop.x_tweet_id}
+          Published{drop.dry_run ? " (dry run)" : ""}
+          {drop.x_tweet_id ? ` · tweet ${drop.x_tweet_id}` : ""}
+          {drop.printful_mockup_url ? (
+            <>
+              {" · "}
+              <a
+                href={drop.printful_mockup_url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-emerald-300"
+              >
+                mockup
+              </a>
+            </>
+          ) : null}
         </p>
       ) : null}
     </li>

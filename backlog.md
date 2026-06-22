@@ -42,6 +42,9 @@ The alternatives, if ever needed:
   `POST /2/media/upload` with defensive id parsing.
 - ~~Hype Score collapse~~ — found by running it: `velocity * volume` zeroed every score on the
   second identical sweep. Rebased on a volume base with a capped velocity boost (`scoring.py`).
+- ~~Factory always failed without secrets~~ — added `FACTORY_DRY_RUN` so the loop completes with
+  clearly-marked simulated outputs (drops reach `published`); backend serves the generated SVG at
+  `/artifacts/<id>.svg`. Real-mode hosting + creds (above) still needed for actual publishing.
 
 ## Phase 2+
 

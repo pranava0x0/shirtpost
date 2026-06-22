@@ -23,6 +23,7 @@ export type Drop = {
   printful_mockup_url: string | null;
   printful_sync_product_id: string | null;
   x_tweet_id: string | null;
+  dry_run: boolean;
   created_at: string;
   published_at: string | null;
 };

@@ -41,6 +41,21 @@ class FactoryPipeline:
             # 1. Build + host the SVG print file. Printful fetches it by URL.
             svg = PrintfulClient.build_text_svg(drop.design_copy)
             artifact = self._write_artifact(drop.id, svg)
+
+            # Dry-run: complete the loop without any external service. Mark every
+            # output as simulated so it can never be mistaken for a real publish.
+            if self._settings.factory_dry_run:
+                base = self._settings.public_base_url.rstrip("/")
+                drop.printful_mockup_url = f"{base}/artifacts/{drop.id}.svg"
+                drop.printful_sync_product_id = f"dryrun-{drop.id}"
+                drop.x_tweet_id = f"dryrun-{drop.id}"
+                drop.dry_run = True
+                drop.status = DropStatus.PUBLISHED
+                drop.published_at = utcnow()
+                session.commit()
+                logger.info("drop %s DRY RUN published (no external calls)", drop.id)
+                return drop
+
             base = self._settings.printful_print_file_base_url
             if not base:
                 raise FactoryError(

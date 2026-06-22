@@ -48,9 +48,13 @@ default `RADAR_SOURCES=["simulated"]` it populates trends with no network or key
 cd frontend
 npm install
 cp .env.example .env.local                # NEXT_PUBLIC_API_BASE_URL
-npm run dev                               # http://localhost:3000
+npm run dev                               # hands-on dev, http://localhost:3000
 npm run typecheck                         # tsc --noEmit
+npm run build && npm run start            # stable serve (what .claude/launch.json uses)
 ```
+
+Note: do not run `next build` and `next dev` against the same `.next` — mixing
+production and dev output corrupts the chunk manifest. Use one or the other.
 
 ## What works end-to-end today
 
@@ -58,6 +62,9 @@ npm run typecheck                         # tsc --noEmit
 - The Factory **fails loud** (drop `status=failed`, `error` surfaced in the UI) until
   Printful + X.com credentials *and* `PRINTFUL_PRINT_FILE_BASE_URL` (SVG hosting) are
   configured. See [backlog.md](backlog.md).
+- Set `FACTORY_DRY_RUN=true` to complete the loop **without** any external service:
+  drops reach `published` with clearly-marked simulated outputs (mockup = the served SVG,
+  `tweet dryrun-<id>`). Default off so a real misconfiguration still fails loud.
 
 ## Security
 

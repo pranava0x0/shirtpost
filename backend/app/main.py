@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import router
@@ -56,6 +58,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router, prefix="/api")
+
+    # Serve generated SVG print files (used by dry-run mockup URLs).
+    artifacts = Path(settings.artifacts_dir)
+    artifacts.mkdir(parents=True, exist_ok=True)
+    app.mount("/artifacts", StaticFiles(directory=str(artifacts)), name="artifacts")
 
     @app.get("/health")
     def health() -> dict[str, str]:
