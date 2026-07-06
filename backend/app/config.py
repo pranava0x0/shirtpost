@@ -42,10 +42,28 @@ class Settings(BaseSettings):
     radar_poll_interval_seconds: int = Field(default=900, ge=30)
     radar_sources: list[str] = Field(
         default=["simulated"],
-        description='Enabled source ids: "simulated", "google_trends", "reddit".',
+        # "wikipedia" is the ToS-clean real source (open pageviews API, no key).
+        # Reddit was dropped (its free API forbids commercial use). Google Trends
+        # has no sanctioned feed until the alpha API is granted — apply for it.
+        description='Enabled source ids: "simulated", "wikipedia", "google_trends".',
     )
     google_trends_rss_url: str = "https://trends.google.com/trending/rss?geo=US"
-    reddit_rss_url: str = "https://www.reddit.com/r/popular/.rss"
+    # Wikipedia most-viewed articles — free, open, ToS-clean. Date is appended as
+    # /YYYY/MM/DD at fetch time (data lags ~1 day, so the radar reads yesterday).
+    wikipedia_top_api: str = (
+        "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access"
+    )
+    wikipedia_top_n: int = Field(default=25, ge=1, le=100)
+    # Family-friendly gate (Phase 3 #5). A cheap keyword blocklist that drops a
+    # trend before it reaches the queue; a stronger LLM classifier is deferred.
+    family_safe_filter_enabled: bool = True
+    family_blocklist: list[str] = Field(
+        default=[
+            "porn", "pornographic", "nsfw", "xxx", "nude", "onlyfans",
+            "rape", "massacre", "genocide", "terrorist attack", "mass shooting",
+            "suicide", "beheading", "execution",
+        ]
+    )
     # Fetch hygiene for live sources (no effect on the simulated source).
     radar_min_request_interval_seconds: float = Field(default=1.5, ge=0.0)
     radar_feed_cache_seconds: int = Field(default=300, ge=0)

@@ -2,14 +2,17 @@
 BeautifulSoup before it is stored or scored, keeping the data (and tokens) clean.
 
 A "simulated" source lets the whole pipeline run end-to-end with zero external
-credentials or network access.
+credentials or network access. "wikipedia" is the ToS-clean real source (open
+pageviews API, no key). Reddit was dropped — its free API forbids commercial use.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 import feedparser
 from bs4 import BeautifulSoup
@@ -20,6 +23,12 @@ from app.radar import fetch
 logger = logging.getLogger(__name__)
 
 _WS = re.compile(r"\s+")
+
+# Wikipedia namespaces / meta pages that aren't real trends.
+_WIKI_SKIP_PREFIXES = (
+    "Special:", "Wikipedia:", "Portal:", "Category:", "Help:",
+    "Template:", "File:", "Talk:", "Draft:",
+)
 
 
 @dataclass(slots=True)
@@ -100,20 +109,84 @@ def fetch_simulated(source_id: str = "simulated") -> list[RawTrend]:
     ]
 
 
+def parse_wikipedia_top(body: str, top_n: int) -> list[RawTrend]:
+    """Parse the Wikimedia most-viewed payload into trends. Split out so it can be
+    tested on a fixture without any network. `volume` is real daily pageviews."""
+    try:
+        articles = json.loads(body)["items"][0]["articles"]
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+        logger.warning("wikipedia parse failed: %s", exc)
+        return []
+    out: list[RawTrend] = []
+    for art in articles:
+        title = art.get("article", "") or ""
+        if not title or title == "Main_Page" or title.startswith(_WIKI_SKIP_PREFIXES):
+            continue
+        term = clean_text(title.replace("_", " "))
+        if not term:
+            continue
+        out.append(
+            RawTrend(
+                term=term,
+                term_raw=title,
+                source="wikipedia",
+                source_url=f"https://en.wikipedia.org/wiki/{title}",
+                volume=int(art.get("views", 0)),
+                measurement="pageviews",
+            )
+        )
+        if len(out) >= top_n:
+            break
+    return out
+
+
+def fetch_wikipedia() -> list[RawTrend]:
+    """Most-viewed English Wikipedia articles yesterday — free, open, ToS-clean."""
+    settings = get_settings()
+    # Pageviews data lags ~1 day, so read yesterday (UTC).
+    day = datetime.now(timezone.utc).date() - timedelta(days=1)
+    url = f"{settings.wikipedia_top_api}/{day.year}/{day.month:02d}/{day.day:02d}"
+    body = fetch.get(url)
+    if body is None:
+        return []
+    out = parse_wikipedia_top(body, settings.wikipedia_top_n)
+    logger.info("radar source=wikipedia parsed=%d", len(out))
+    return out
+
+
+def is_family_safe(term: str, blocklist: list[str]) -> bool:
+    """Cheap keyword gate: a trend is dropped if its term contains a blocklisted
+    word. A first-pass heuristic — an LLM classifier (deferred) would be better."""
+    low = term.lower()
+    return not any(bad in low for bad in blocklist)
+
+
 def collect(source_ids: list[str]) -> list[RawTrend]:
-    """Run every configured source. One source crashing never sinks the rest."""
+    """Run every configured source. One source crashing never sinks the rest.
+    Family-unsafe trends are filtered out before they reach the queue."""
     settings = get_settings()
     results: list[RawTrend] = []
     for sid in source_ids:
         try:
             if sid == "simulated":
                 results.extend(fetch_simulated())
+            elif sid == "wikipedia":
+                results.extend(fetch_wikipedia())
             elif sid == "google_trends":
                 results.extend(fetch_rss("google_trends", settings.google_trends_rss_url))
-            elif sid == "reddit":
-                results.extend(fetch_rss("reddit", settings.reddit_rss_url))
             else:
                 logger.warning("unknown radar source id=%s (skipping)", sid)
         except Exception as exc:
             logger.exception("radar source=%s crashed: %s", sid, exc)
-    return results
+
+    if not settings.family_safe_filter_enabled:
+        return results
+    kept: list[RawTrend] = []
+    for row in results:
+        if is_family_safe(row.term, settings.family_blocklist):
+            kept.append(row)
+        else:
+            logger.info(
+                "radar family filter dropped term=%r source=%s", row.term, row.source
+            )
+    return kept

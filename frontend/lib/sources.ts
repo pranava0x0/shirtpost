@@ -4,8 +4,8 @@
 
 export const SOURCE_LABELS: Record<string, string> = {
   simulated: "Simulated (seed data)",
+  wikipedia: "Wikipedia (most viewed)",
   google_trends: "Google Trends",
-  reddit: "Reddit",
 };
 
 export function sourceLabel(source: string): string {

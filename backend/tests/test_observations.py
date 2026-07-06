@@ -90,8 +90,8 @@ def test_normalized_hype_is_per_source_and_bounded():
                 Trend(term="big-b", term_raw="big-b", source="google_trends",
                       measurement="search_traffic", volume=50_000, hype_score=50_000.0,
                       first_seen_at=utcnow(), last_seen_at=utcnow()),
-                Trend(term="small-a", term_raw="small-a", source="reddit",
-                      measurement="presence", volume=1, hype_score=1.0,
+                Trend(term="small-a", term_raw="small-a", source="wikipedia",
+                      measurement="pageviews", volume=1, hype_score=1.0,
                       first_seen_at=utcnow(), last_seen_at=utcnow()),
             ]
         )
@@ -100,7 +100,7 @@ def test_normalized_hype_is_per_source_and_bounded():
         by_term = {t["term"]: t for t in client.get("/api/trends?limit=200").json()}
     assert by_term["big-a"]["normalized_hype"] == 1.0  # top of its source
     assert by_term["big-b"]["normalized_hype"] == 0.0  # bottom of its source
-    # The lone reddit trend normalizes to 1.0 on its own lane, not ~0 globally.
+    # The lone wikipedia trend normalizes to 1.0 on its own lane, not ~0 globally.
     assert by_term["small-a"]["normalized_hype"] == 1.0
     for t in by_term.values():
         assert 0.0 <= t["normalized_hype"] <= 1.0
@@ -111,11 +111,11 @@ def test_trends_can_be_filtered_by_source():
     with SessionLocal() as s:
         from app.models import utcnow
 
-        s.add(Trend(term="only-reddit", term_raw="only-reddit", source="reddit",
-                    measurement="presence", volume=1, hype_score=1.0,
+        s.add(Trend(term="only-wiki", term_raw="only-wiki", source="wikipedia",
+                    measurement="pageviews", volume=1, hype_score=1.0,
                     first_seen_at=utcnow(), last_seen_at=utcnow()))
         s.commit()
     with TestClient(app) as client:
-        reddit = client.get("/api/trends?source=reddit").json()
-    assert reddit
-    assert all(t["source"] == "reddit" for t in reddit)
+        wiki = client.get("/api/trends?source=wikipedia").json()
+    assert wiki
+    assert all(t["source"] == "wikipedia" for t in wiki)
