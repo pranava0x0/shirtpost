@@ -3,29 +3,33 @@
 _Drafted 2026-07-05 from web research + repo state. Review before executing._
 _Phase 1 (Radar + Studio + Factory scaffold) is merged and verified — see STATUS.md._
 
-## Progress (2026-07-05)
+## Progress (2026-07-06)
 
-The **code-doable, $0, no-account** parts of 2A/2B are done and verified (see the
-Phase-1.5/2A/2B commits + PR). What's implemented:
+Every **code-doable, $0, no-account** item across 2A/2B/3/4 is now implemented and
+verified (see the Phase-1.5/2A/2B/3 commits + PR). What's implemented:
 
 - **2A #1 Rasterize print files** ✓ — `factory/render.py` (Pillow → transparent PNG).
+- **2A #2 Print-file storage** ✓ — `factory/storage.py`: `local` (default) + `github_pages`
+  backends, env-selected. `github_pages` pushes the PNG + polls until live, idempotent.
+  R2 (boto3 + card) stays the deferred upgrade path.
 - **2A #4 Retries + idempotency** ✓ — resumable pipeline + `POST /api/drops/{id}/retry`.
 - **2A #5 Garment-color safety** ✓ — ink derives from `PRINTFUL_GARMENT_COLOR`.
 - **2B Web Intent broadcast** ✓ — `X_BROADCAST_MODE=intent` default ($0, no keys) +
-  "Post to X" button; API client stays behind `=api`.
-- **3 #3 Per-source lanes** ✓ and **3 #4 `trend_observations`** ✓ — landed early (Phase 1.5).
+  "Post to X" button; API client behind `=api` with a per-post cost log and an
+  `X_MONTHLY_BUDGET_USD` fail-loud guard.
+- **3 #2 Real source** ✓ — Wikipedia most-viewed (open API, ToS-clean); Reddit dropped.
+- **3 #3 Per-source lanes** ✓, **3 #4 `trend_observations`** ✓, **3 #5 family filter** ✓.
+- **4 #4 Hash-locked installs** ✓ — `requirements*.lock` + CI `--require-hashes`.
 
-**Blocked on a human step / an upgrade trigger (correctly not built yet):**
-- **2A #2 print-file storage** (GitHub Pages artifacts repo / R2) — needs the repo
-  created + a token. Real-mode Printful can't run until this lands; dry-run serves the
-  PNG locally today.
-- **2A #3 Printful v1 product create** — the client already targets v1 and now uploads
-  PNG; needs a free Printful account to exercise live.
+**Genuinely human-gated (can't be coded — need you):**
+- **2A #3 Printful account** — the client targets v1 and uploads PNG; needs a free
+  account to exercise live publishing.
+- **2A #2 hosting setup** — create the GitHub Pages artifacts repo + a token (or R2).
+  The code is done; real-mode Printful just needs the repo to exist.
 - **2B Quick Store validation** — a manual 30-min test with a real account.
-- **Phase 3 real sources / family filter** — deferred until there are real sources to
-  filter (no future-proofing ahead of the trigger); apply for Trends alpha (human step).
-- **Phase 4 auth/deploy/backups** — the only paid phase; deferred until sales.
-- **Hash-locked installs** — do anytime; deferred to its own change (touches CI).
+- **Google Trends alpha** — apply (rolling access, weeks of lead time).
+- **Phase 4 auth / deploy / backups** — the only paid phase; deferred until sales.
+- **Phase 5** (better art, analytics, Postgres) — deferred until real drops prove the loop.
 
 **Constraint: $0 to start.** Every phase below runs on free tiers or locally until
 the first sales justify paid automation. The two paid items from the first draft

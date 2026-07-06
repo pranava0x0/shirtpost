@@ -11,9 +11,10 @@ rasterization** (Printful rejects SVG), and **free X Web-Intent broadcast** (X h
 no free API tier). Delivered as a PR against `main`. Remaining plan work is
 human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
-## Verified (all green, 2026-07-05)
+## Verified (all green, 2026-07-06)
 
-- Backend: `pytest` = **79 passed** on CPython 3.12 (was 30 at scaffold).
+- Backend: `pytest` = **94 passed** on CPython 3.12 (was 30 at scaffold); the
+  Wikipedia parser is also live-validated against the real API.
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
   hype sparklines and within-source meters; `submit` → **fails loud** with the
@@ -51,16 +52,23 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 - **Garment-color safety** — ink derived from `PRINTFUL_GARMENT_COLOR` for
   contrast; never white-on-white on a light garment.
 
-## Phase 2A/2B ($0 corrections from PLAN.md — this branch)
+## Phase 2A/2B/3/4 ($0, code-doable PLAN.md items — this branch)
 
 - **PNG rasterization** (2A #1) — research found Printful rejects SVG.
   `factory/render.py` (Pillow, bundled scalable font — no system cairo, no
   vendored binary) renders a transparent print-ready PNG; the SVG stays as the
-  source. Pipeline hosts/serves `<id>.png`. `pillow==12.3.0` (advisory-swept).
-- **Free X broadcast** (2B) — X has no free API tier since 2026-02.
+  source. `pillow==12.3.0` (advisory-swept).
+- **Print-file storage** (2A #2) — `factory/storage.py`: `PRINT_FILE_STORAGE`
+  = `local` (serve from this backend; fails loud on localhost) or `github_pages`
+  (push to a public artifacts repo + poll until live, idempotent). R2 deferred.
+- **Free X broadcast + budget guard** (2B) — X has no free API tier since 2026-02.
   `X_BROADCAST_MODE=intent` (default) generates a prefilled `x.com/intent/post`
-  URL the operator clicks — $0, no keys. `=api` keeps the auto-post path (logs an
-  estimated per-post cost). "Post to X" button in the Studio.
+  URL the operator clicks — $0, no keys. `=api` auto-posts, logs an estimated
+  per-post cost, and honors `X_MONTHLY_BUDGET_USD` (fail-loud). "Post to X" button.
+- **Real source + family filter** (3 #2/#5) — `wikipedia` most-viewed (open API,
+  ToS-clean); Reddit dropped (commercial ToS); a keyword blocklist drops unsafe
+  trends before the queue.
+- **Hash-locked installs** (4 #4) — `requirements*.lock` + CI `--require-hashes`.
 
 ## Dev environment already provisioned (don't redo)
 
@@ -86,13 +94,14 @@ npm run dev                                   # http://localhost:3000
 
 ## Open decision
 
-- **Merge the Phase 1.5 PR** once CI is green. No AI co-author / footer per CLAUDE.md.
+- **Merge the PR** once CI is green. No AI co-author / footer per CLAUDE.md.
 
 ## Next-up gaps (full list in backlog.md)
 
-1. **Factory can't fully complete** until `PRINTFUL_PRINT_FILE_BASE_URL` (SVG
-   hosting) + Printful/X creds exist. Until then, submissions fail loud by
-   design. [high]
+1. **Real-mode Printful needs a human step, not code**: a free Printful account +
+   PNG hosting (`PRINT_FILE_STORAGE=github_pages` → create the artifacts repo + a
+   token, or deploy so `local` is publicly reachable). The pipeline + storage code
+   are done; submissions fail loud until hosting is reachable. [high]
 2. **No auth on the admin API** — required before any non-local deploy. A
    meaningful refactor (route the dashboard through Next.js server-side so the
    token stays server-only); deferred while not deploying. [high]

@@ -66,6 +66,10 @@ production and dev output corrupts the chunk manifest. Use one or the other.
 ## What works end-to-end today
 
 - Radar → DB → Admin queue → submit → Factory pipeline runs and records status.
+- Sources: `simulated` (seeds, no network) and **`wikipedia`** (most-viewed articles —
+  free, open, ToS-clean; real daily pageviews). A **family-friendly keyword filter** drops
+  unsafe trends before they reach the queue. (Reddit was removed — its free API bars
+  commercial use.)
 - Every sweep appends a `trend_observations` row, so the Studio draws a real hype
   **sparkline** per trend (not just the latest delta). Trends are grouped into
   **per-source lanes** — volumes aren't comparable across sources, so a within-source
@@ -73,13 +77,17 @@ production and dev output corrupts the chunk manifest. Use one or the other.
 - The Factory builds the SVG as a source artifact and **rasterizes a transparent PNG**
   (Printful's DTG pipeline rejects SVG). Print ink color is derived from
   `PRINTFUL_GARMENT_COLOR` for contrast, so art never prints white-on-white.
+- The PNG is hosted via **`PRINT_FILE_STORAGE`** — `local` (served from this backend) or
+  `github_pages` (push to a public artifacts repo + poll until live, $0). It returns the
+  URL Printful fetches.
 - Broadcast defaults to **`X_BROADCAST_MODE=intent`** — the Studio shows a "Post to X"
   button linking a prefilled `x.com/intent/post` (X has no free API tier; this is $0, no
-  keys). `=api` auto-posts via credentials and logs an estimated per-post cost.
+  keys). `=api` auto-posts via credentials, logs an estimated per-post cost, and honors an
+  `X_MONTHLY_BUDGET_USD` fail-loud cap.
 - The Factory **fails loud** (drop `status=failed`, `error` surfaced in the UI) until
-  Printful credentials *and* `PRINTFUL_PRINT_FILE_BASE_URL` (PNG hosting) are configured.
-  A failed drop can be **retried** from the UI; the pipeline resumes from the last committed
-  step and never re-posts a tweet it already sent. See [PLAN.md](docs/PLAN.md) / [backlog.md](backlog.md).
+  Printful credentials and reachable PNG hosting are configured. A failed drop can be
+  **retried** from the UI; the pipeline resumes from the last committed step and never
+  re-posts a tweet it already sent. See [PLAN.md](docs/PLAN.md) / [backlog.md](backlog.md).
 - Set `FACTORY_DRY_RUN=true` to complete the loop **without** any external service:
   drops reach `published` with clearly-marked simulated outputs (mockup = the served PNG;
   intent URL for the operator). Default off so a real misconfiguration still fails loud.

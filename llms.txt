@@ -11,7 +11,7 @@
 ## Scraper Engine (The Radar)
 
 - [config.py](backend/app/config.py): Strict env-validated runtime settings (pydantic-settings).
-- [sources.py](backend/app/radar/sources.py): Text-only feed adapters that HTML-strip every title with BeautifulSoup before storage.
+- [sources.py](backend/app/radar/sources.py): Feed adapters (simulated + Wikipedia most-viewed, ToS-clean) that HTML-strip titles, plus a family-friendly keyword filter applied before the queue.
 - [fetch.py](backend/app/radar/fetch.py): Live-source HTTP with disk caching, per-host rate limiting, and 429 backoff.
 - [scoring.py](backend/app/radar/scoring.py): Hype Score — a volume base with a capped velocity boost, so steady trends never collapse to zero.
 - [worker.py](backend/app/radar/worker.py): Background poller that upserts trends and recomputes scores per sweep.
@@ -26,6 +26,7 @@
 
 - [printful.py](backend/app/factory/printful.py): Printful client — builds the SVG source, generates mockups, syncs the store catalog; XML-escaped payloads and garment-contrast ink selection.
 - [render.py](backend/app/factory/render.py): Rasterizes the design copy to a transparent print-ready PNG with Pillow (Printful rejects SVG); bundled scalable font, no system libs.
+- [storage.py](backend/app/factory/storage.py): Hosts the PNG where Printful can fetch it — `local` (served by this backend) or `github_pages` (push + poll until live); returns the public URL.
 - [xcom.py](backend/app/factory/xcom.py): X.com — prefilled Web Intent URL (free default) and the v2 media-upload + tweet client for auto-post (`api`) mode.
 - [pipeline.py](backend/app/factory/pipeline.py): Idempotent Factory pipeline — builds SVG + PNG, Printful mockup/sync, then a mode-aware broadcast (intent/api); each step commits as it lands and is skipped on retry, so a posted tweet is never sent twice.
 

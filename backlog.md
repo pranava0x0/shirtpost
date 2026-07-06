@@ -17,22 +17,29 @@ The alternatives, if ever needed:
 
 ## Factory pipeline gaps
 
-- **Host the PNG print files** (priority: high, PLAN.md 2A #2). The Factory now renders
-  `artifacts/<drop_id>.png` (Printful rejects SVG) and fails loud until
-  `PRINTFUL_PRINT_FILE_BASE_URL` points at a reachable host. Plan default is a **GitHub Pages
-  artifacts repo** ($0, no card; push the PNG, poll the URL until live); **Cloudflare R2** is the
-  upgrade path. Needs the artifacts repo created + a token — the last thing gating real-mode
-  Printful. Until then, dry-run serves the PNG locally.
+- **Real-mode Printful hosting setup** (priority: high — a human step, not code, PLAN.md 2A #2/#3).
+  The storage code is done (`PRINT_FILE_STORAGE=local|github_pages`); what's left is external:
+  create the GitHub Pages artifacts repo + a token (or deploy so `local` is publicly reachable),
+  and a free Printful account to exercise live. Until hosting is reachable, submissions fail loud.
+  **Cloudflare R2** (boto3 + a card) is the deferred storage upgrade.
 - **FastAPI + Starlette BadHost upgrade** (priority: high). Pin fastapi/starlette to the
   CVE-2026-48710-patched line once resolvable; confirm `starlette >= 1.0.1`. Interim mitigation
   (TrustedHostMiddleware) is in place. See `security.md`. **Blocked:** `starlette >= 1.0.1` is a
   major jump incompatible with the pinned `fastapi==0.115.6` (needs `starlette < 0.42`); do it as
   a coordinated fastapi+starlette upgrade with a fresh advisory sweep, not a lone bump.
-- **Lock files / hash-locked installs** (priority: medium). The frontend commits
-  `package-lock.json` (CI uses `npm ci`); add `uv lock` / `pip-compile --generate-hashes` for the
-  backend and install with `--require-hashes`.
 
 ## Done (was here, now implemented)
+
+- ~~Print-file storage~~ (PLAN.md 2A #2) — `factory/storage.py`: `local` (serve from this backend,
+  fails loud on localhost) + `github_pages` (push to a public artifacts repo + poll until live,
+  idempotent via blob sha). Replaced the `PRINTFUL_PRINT_FILE_BASE_URL` assumption. R2 deferred.
+- ~~Real ToS-clean source + family filter~~ (PLAN.md 3 #2/#5) — `wikipedia` most-viewed articles
+  (open pageviews API, no key); Reddit dropped (commercial ToS); a keyword blocklist drops
+  family-unsafe trends before the queue (an LLM classifier would be stronger — deferred).
+- ~~X monthly budget guard~~ (PLAN.md 2B) — `X_MONTHLY_BUDGET_USD` refuses an api-mode auto-post
+  that would exceed the month's cap (conservative count). Free intent mode is unaffected.
+- ~~Lock files / hash-locked installs~~ (PLAN.md 4 #4) — `requirements.lock` / `requirements-dev.lock`
+  (`uv pip compile --generate-hashes`); CI installs with `--require-hashes`.
 
 - ~~Trend observation history~~ — append-only `trend_observations` table; the worker writes one
   snapshot per sweep (`worker.py`), `GET /api/trends/{id}/observations` serves the history, and each
