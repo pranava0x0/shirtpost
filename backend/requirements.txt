@@ -1,5 +1,10 @@
 # Pinned exact (==) per CLAUDE.md supply-chain hardening. Install with:
 #   pip install -r requirements.txt
+# This file is the source of truth for direct deps. requirements.lock /
+# requirements-dev.lock are the hash-locked, fully-resolved sets CI installs with
+# `--require-hashes`. After editing this file, regenerate them:
+#   uv pip compile requirements.txt     --generate-hashes -o requirements.lock
+#   uv pip compile requirements-dev.txt --generate-hashes -o requirements-dev.lock
 # Security note (see security.md): CVE-2026-48710 "BadHost" affects starlette
 # < 1.0.1. The interim mitigation is TrustedHostMiddleware (wired in main.py).
 # Before production, upgrade fastapi+starlette to the BadHost-patched line and
