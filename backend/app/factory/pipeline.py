@@ -18,8 +18,13 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.factory.printful import PrintfulClient
 from app.factory.render import render_text_png
-from app.factory.xcom import XClient
+from app.factory.xcom import XClient, build_x_intent_url
 from app.models import Drop, DropStatus, Trend, utcnow
+
+# Rough X API cost per post (2026 pay-per-use): ~$0.20 with a URL, else ~$0.015.
+# Only relevant when x_broadcast_mode="api"; logged so a metered bill is visible.
+_X_POST_COST_URL = 0.20
+_X_POST_COST_PLAIN = 0.015
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +59,8 @@ class FactoryPipeline:
                 base = self._settings.public_base_url.rstrip("/")
                 drop.printful_mockup_url = f"{base}/artifacts/{drop.id}.png"
                 drop.printful_sync_product_id = f"dryrun-{drop.id}"
-                drop.x_tweet_id = f"dryrun-{drop.id}"
                 drop.dry_run = True
+                self._broadcast(session, drop, trend, mockup_url=None, simulate=True)
                 drop.status = DropStatus.PUBLISHED
                 drop.published_at = utcnow()
                 session.commit()
@@ -72,11 +77,10 @@ class FactoryPipeline:
             print_file_url = f"{base.rstrip('/')}/{drop.id}.png"
 
             printful = PrintfulClient(self._settings)
-            x = XClient(self._settings)
 
             # Each external step commits its result as it lands and is skipped if
             # already present, so retrying a failed drop RESUMES rather than
-            # repeats — critically, it never posts a second tweet (see step 4).
+            # repeats — critically, it never posts a second tweet (see _broadcast).
 
             # 2. Printful mockup.
             if not drop.printful_mockup_url:
@@ -93,26 +97,16 @@ class FactoryPipeline:
                 )
                 session.commit()
 
-            # 4. X.com: upload mockup then tweet (v2) with the media_id. Gated on
-            # x_tweet_id and committed on its own BEFORE the published transition,
-            # so a failure after posting can't make a retry double-post.
-            if not drop.x_tweet_id:
-                store_base = self._settings.store_base_url
-                product_url = (
-                    f"{store_base.rstrip('/')}/{drop.printful_sync_product_id}"
-                    if store_base
-                    else None
-                )
-                media_id = x.upload_media(self._download(mockup_url))
-                drop.x_tweet_id = x.post_tweet(
-                    self._broadcast_copy(trend.term, product_url), media_id=media_id
-                )
-                session.commit()
+            # 4. Broadcast (intent = free, or api = auto-post).
+            self._broadcast(session, drop, trend, mockup_url=mockup_url, simulate=False)
 
             drop.status = DropStatus.PUBLISHED
             drop.published_at = utcnow()
             session.commit()
-            logger.info("drop %s published tweet=%s", drop.id, drop.x_tweet_id)
+            logger.info(
+                "drop %s published (tweet=%s intent=%s)",
+                drop.id, drop.x_tweet_id, bool(drop.x_intent_url),
+            )
             return drop
         except Exception as exc:
             session.rollback()
@@ -136,6 +130,40 @@ class FactoryPipeline:
         )
         resp.raise_for_status()
         return resp.content
+
+    def _product_url(self, drop: Drop) -> str | None:
+        """The buyable product URL, if a storefront is wired. Only then does the
+        broadcast claim a purchasable drop (see _broadcast_copy)."""
+        store_base = self._settings.store_base_url
+        if store_base and drop.printful_sync_product_id:
+            return f"{store_base.rstrip('/')}/{drop.printful_sync_product_id}"
+        return None
+
+    def _broadcast(
+        self, session: Session, drop: Drop, trend: Trend, *, mockup_url: str | None, simulate: bool
+    ) -> None:
+        """Broadcast the drop. Default "intent" mode is $0: generate a prefilled
+        x.com/intent/post URL the operator clicks — no API key, no metered bill.
+        "api" mode auto-posts (and logs an estimated per-post cost). Both are
+        idempotent so a retry never re-broadcasts."""
+        text = self._broadcast_copy(trend.term, self._product_url(drop))
+        if self._settings.x_broadcast_mode == "intent":
+            if not drop.x_intent_url:
+                drop.x_intent_url = build_x_intent_url(text)
+                session.commit()
+            return
+        # api mode — auto-post. Gated on x_tweet_id so a retry never double-posts.
+        if drop.x_tweet_id:
+            return
+        if simulate:  # dry-run + api mode
+            drop.x_tweet_id = f"dryrun-{drop.id}"
+        else:
+            x = XClient(self._settings)
+            media_id = x.upload_media(self._download(mockup_url))
+            drop.x_tweet_id = x.post_tweet(text, media_id=media_id)
+            cost = _X_POST_COST_URL if self._product_url(drop) else _X_POST_COST_PLAIN
+            logger.info("drop %s auto-posted to X (est cost ~$%.3f)", drop.id, cost)
+        session.commit()
 
     @staticmethod
     def _broadcast_copy(term: str, product_url: str | None = None) -> str:

@@ -39,6 +39,8 @@ export type Drop = {
   printful_mockup_url: string | null;
   printful_sync_product_id: string | null;
   x_tweet_id: string | null;
+  // Prefilled x.com/intent/post URL (intent mode) — the operator clicks Post.
+  x_intent_url: string | null;
   dry_run: boolean;
   created_at: string;
   published_at: string | null;

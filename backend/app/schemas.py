@@ -57,6 +57,7 @@ class DropOut(BaseModel):
     printful_mockup_url: str | None
     printful_sync_product_id: str | None
     x_tweet_id: str | None
+    x_intent_url: str | None
     dry_run: bool
     created_at: datetime
     published_at: datetime | None

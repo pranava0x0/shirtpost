@@ -201,23 +201,35 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
       ) : null}
 
       {drop?.status === "published" ? (
-        <p className="mt-2 text-xs text-emerald-400">
-          Published{drop.dry_run ? " (dry run)" : ""}
-          {drop.x_tweet_id ? ` · tweet ${drop.x_tweet_id}` : ""}
-          {drop.printful_mockup_url ? (
-            <>
-              {" · "}
-              <a
-                href={drop.printful_mockup_url}
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-emerald-300"
-              >
-                mockup
-              </a>
-            </>
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-emerald-400">
+            Published{drop.dry_run ? " (dry run)" : ""}
+            {drop.x_tweet_id ? ` · tweet ${drop.x_tweet_id}` : ""}
+            {drop.printful_mockup_url ? (
+              <>
+                {" · "}
+                <a
+                  href={drop.printful_mockup_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline hover:text-emerald-300"
+                >
+                  mockup
+                </a>
+              </>
+            ) : null}
+          </p>
+          {drop.x_intent_url && !drop.x_tweet_id ? (
+            <a
+              href={drop.x_intent_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-[44px] items-center rounded-lg border border-sky-500/40 px-4 text-sm font-medium text-sky-300 transition hover:border-sky-400 hover:text-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+            >
+              Post to X ↗
+            </a>
           ) : null}
-        </p>
+        </div>
       ) : null}
     </li>
   );

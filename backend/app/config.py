@@ -11,6 +11,7 @@ time if the credentials it needs are absent.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -79,7 +80,13 @@ class Settings(BaseSettings):
     # the post is a teaser, never a "live"/buyable claim.
     store_base_url: str | None = None
 
-    # --- X.com (OAuth 1.0a user context: required for v1.1 media + v2 tweets) -
+    # --- X.com broadcast ----------------------------------------------------
+    # X has no free API tier since 2026-02 (~$0.20/post with a URL). Default to
+    # "intent": the Factory generates a prefilled x.com/intent/post URL and the
+    # operator clicks Post ($0, no keys). "api" auto-posts via the credentials
+    # below (metered — logs an estimated per-post cost).
+    x_broadcast_mode: Literal["intent", "api"] = "intent"
+    # OAuth 1.0a user context — only needed when x_broadcast_mode="api".
     x_api_key: str | None = None
     x_api_secret: str | None = None
     x_access_token: str | None = None

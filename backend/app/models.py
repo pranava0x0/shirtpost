@@ -130,7 +130,9 @@ class Drop(Base):
 
     printful_mockup_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     printful_sync_product_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    x_tweet_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    x_tweet_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # set when auto-posted (api mode)
+    # Prefilled x.com/intent/post URL for the operator to click (intent mode, $0).
+    x_intent_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     dry_run: Mapped[bool] = mapped_column(Boolean, default=False)  # simulated, not really published
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

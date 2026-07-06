@@ -19,9 +19,12 @@ from app.models import Drop, DropStatus, Trend, utcnow
 
 
 def _real_mode_settings() -> Settings:
+    # api broadcast mode: these tests are about the auto-post path and its
+    # never-double-post-on-retry guarantee (intent mode makes no external call).
     return Settings(
         printful_api_key="k",
         printful_print_file_base_url="https://cdn.example.com/prints",
+        x_broadcast_mode="api",
         x_api_key="a",
         x_api_secret="b",
         x_access_token="c",
