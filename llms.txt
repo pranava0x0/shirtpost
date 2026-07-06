@@ -7,6 +7,9 @@
 - [CLAUDE.md](CLAUDE.md): Universal development principles this project is built against.
 - [security.md](security.md): Supply-chain advisory sweep log and the mitigations applied.
 - [backlog.md](backlog.md): Deferred ideas and Phase 2+ work, with priorities.
+- [issues.md](issues.md): Bug audit trail — each bug's root cause, fix, commit, and regression test.
+- [docs/PLAN.md](docs/PLAN.md): The $0-to-start Phase 2→live build-out plan, with a progress banner.
+- [docs/SESSION-HISTORY.md](docs/SESSION-HISTORY.md): How the build-out was done — agents/tools used, decisions, gotchas.
 
 ## Scraper Engine (The Radar)
 

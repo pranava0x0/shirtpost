@@ -344,6 +344,10 @@ Don't drive a responsive show/hide off the `hidden` attribute or a native `<deta
 
 A single hype-descending list that mixes rows whose numbers mean different things (a search-traffic estimate vs. a "present in feed" flag) tells the eye they're on one scale — the low-scale source always sinks to the bottom and reads as "least important." Group into labeled per-source lanes and rank within each; label the lane ("ranked within source"). A within-lane meter (§ 8.7) then compares only comparable things. The data-layer rule behind this lives in CLAUDE.md ("don't rank incomparable series on one scale").
 
+### 12.13 Scaled visuals must handle the zero-range (flat) case explicitly
+
+Any chart that normalizes values to a pixel range — sparkline, meter, bar, heat cell — divides by `(max − min)`. When every point is equal that span is 0, and the usual guard `span = max − min || 1` doesn't *center* the result, it maps every value to `1 − 0 = 1` → the far edge (a flat sparkline pinned to the bottom, not the middle). Special-case it: if `max === min`, place the flat line at the mid-line (`height / 2`) and the meter at whatever "no relative signal" should read as. Don't trust a comment that *claims* it's centered — compute the degenerate case and look. (This is the visual sibling of the data rule that a single observation normalizes to 1.0, not 0.)
+
 ---
 
 ## 13. What's intentionally NOT in design

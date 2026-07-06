@@ -167,6 +167,10 @@ This is a schema change. **Don't do this casually.** Steps:
 
 A PR in **"COMMENTED"** state means action required, not FYI. Fetch full review bodies (not the summary line), treat any user-provided link as authoritative, extract a checklist of each distinct issue, and verify the specific flow each names — not just the happy path. The merge is the start of addressing feedback, not the end.
 
+### Reviewing your own PR
+
+To review code you wrote, spawn **independent reviewer agents with distinct lenses** (a correctness/logic pass and a silent-failure/error-handling pass) rather than re-reading it yourself — author bias skips the same lines twice. Give each the exact diff scope (`git diff main...HEAD`), the highest-risk files, and "report findings, don't fix." They read the committed diff, so you can keep editing your working tree while they run. Then **critically evaluate every finding before applying it** — a suggested fix can be wrong for the context: on ShirtPost a reviewer proposed word-boundary matching for the family-safe filter, which would have *weakened* a safety gate (`\bporn\b` misses "Pornhub"), so the right move was to keep substring matching and document why. Log the confirmed bugs (root cause + fix + commit + regression test) in `issues.md`; that file is what the review is *for*.
+
 ### Driving a browser to scrape (Chrome / Playwright MCP)
 
 Concrete gotchas that aren't obvious until you hit them:

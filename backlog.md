@@ -92,6 +92,19 @@ The alternatives, if ever needed:
   honest within-source ranking. If sources later need cross-source triage (one merged action queue),
   add an explicit exposure-weighted score — never a bare `hype_score` compare across measurements.
 
+## Open follow-ups from code review (2026-07-06)
+
+- **LLM family-safe classifier** (priority: medium, PLAN.md 3 #5). The keyword blocklist over-blocks
+  ("grape harvest") and can't judge context ("Suicide Squad (film)"). A Haiku pass cached by content
+  hash, gated behind the keyword filter, is the real fix — deferred (needs an API key + cost budget).
+- **Wikipedia date fallback** (priority: low). The source reads `-1 day`; if that day's pageviews
+  aren't published yet the source is empty that sweep (now logged). Try `-2` on a 404.
+- **github_pages: webhook over 2-min poll** (priority: low). `_wait_until_live` blocks a worker thread
+  up to ~2 min on a first publish (Pages deploy lag). Fine for a single operator; a Pages-deploy
+  webhook would free the thread if throughput ever matters. See `issues.md`.
+- **Per-source sweep coverage counts** (priority: low). `run_sweep_once` logs a single `touched=N`;
+  a per-source `fetched/parsed/dropped` line would make a silently-failing source obvious at a glance.
+
 ## Phase 2+
 
 - **Public storefront + checkout** (priority: low for now). Explicitly out of Phase 1 scope.
