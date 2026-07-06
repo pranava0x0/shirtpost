@@ -15,14 +15,15 @@ export function Sparkline({
 
   const min = Math.min(...points);
   const max = Math.max(...points);
-  const span = max - min || 1; // flat series -> a centered horizontal line
+  const flat = max === min; // a flat series draws a centered horizontal line
+  const span = max - min;
   const stepX = width / (points.length - 1);
   const pad = 2;
   const usableH = height - pad * 2;
 
   const coords = points.map((p, i) => {
     const x = i * stepX;
-    const y = pad + usableH * (1 - (p - min) / span);
+    const y = flat ? height / 2 : pad + usableH * (1 - (p - min) / span);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
 

@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 
 import requests
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -166,13 +166,24 @@ class FactoryPipeline:
         if budget is None:
             return
         month_start = utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # Count on x_tweet_id — the actual spend signal, committed a step before
+        # published_at. A drop that posted then crashed before publishing has a
+        # NULL published_at; filtering on published_at alone would miss it and let
+        # the cap be walked past. So also count posted-but-unpublished drops
+        # created this month (bounded, and conservative — errs toward blocking).
         posted = session.scalar(
             select(func.count())
             .select_from(Drop)
             .where(
                 Drop.x_tweet_id.is_not(None),
                 Drop.dry_run.is_(False),
-                Drop.published_at >= month_start,
+                or_(
+                    Drop.published_at >= month_start,
+                    and_(
+                        Drop.published_at.is_(None),
+                        Drop.created_at >= month_start,
+                    ),
+                ),
             )
         )
         projected = (posted + 1) * _X_POST_COST_URL

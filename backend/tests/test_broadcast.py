@@ -101,3 +101,20 @@ def test_x_budget_guard_allows_under_cap():
 def test_x_budget_guard_is_noop_without_a_cap():
     with SessionLocal() as session:
         FactoryPipeline(Settings(x_broadcast_mode="api"))._enforce_x_budget(session)
+
+
+def test_x_budget_guard_counts_posted_but_unpublished_drops():
+    # Regression: a drop that posted its tweet (x_tweet_id set) then crashed
+    # before published_at was set must still count — filtering on published_at
+    # alone missed it and let the cap be walked past.
+    with SessionLocal() as session:
+        drop = _seed_drop(session)
+        session.add(
+            Drop(trend_id=drop.trend_id, design_copy="crashed", status=DropStatus.FAILED,
+                 x_tweet_id="123", dry_run=False, published_at=None)  # created_at = now
+        )
+        session.commit()
+        pipe = FactoryPipeline(Settings(x_broadcast_mode="api", x_monthly_budget_usd=0.20))
+        with pytest.raises(RuntimeError) as exc:
+            pipe._enforce_x_budget(session)
+        assert "budget" in str(exc.value).lower()

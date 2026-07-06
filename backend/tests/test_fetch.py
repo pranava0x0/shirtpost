@@ -54,6 +54,27 @@ def test_get_retries_on_429_then_succeeds(monkeypatch):
     assert calls["n"] == 2
 
 
+def test_get_backs_off_on_connection_error_then_succeeds(monkeypatch):
+    # A connection error retries (with backoff) instead of burning retries in a
+    # burst — same treatment as a 429, so a transient blip is ridden through.
+    url = "https://example.com/conn.rss"
+    p = fetch._cache_path(url)
+    if p.exists():
+        p.unlink()
+    monkeypatch.setattr(fetch.time, "sleep", lambda *_: None)  # no real backoff wait
+    calls = {"n": 0}
+
+    def fake_get(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise fetch.requests.RequestException("connection reset")
+        return FakeResp(200, "OK")
+
+    monkeypatch.setattr(fetch.requests, "get", fake_get)
+    assert fetch.get(url) == "OK"
+    assert calls["n"] == 2
+
+
 def test_get_returns_none_on_4xx(monkeypatch):
     url = "https://example.com/gone.rss"
     p = fetch._cache_path(url)

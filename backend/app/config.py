@@ -57,11 +57,14 @@ class Settings(BaseSettings):
     # Family-friendly gate (Phase 3 #5). A cheap keyword blocklist that drops a
     # trend before it reaches the queue; a stronger LLM classifier is deferred.
     family_safe_filter_enabled: bool = True
+    # Substring-matched (see is_family_safe — a safety filter over-blocks on
+    # purpose). Tuned to avoid the worst false positives: "execution" was dropped
+    # (too common in innocent "code execution"); "beheading" covers the violent case.
     family_blocklist: list[str] = Field(
         default=[
             "porn", "pornographic", "nsfw", "xxx", "nude", "onlyfans",
             "rape", "massacre", "genocide", "terrorist attack", "mass shooting",
-            "suicide", "beheading", "execution",
+            "suicide", "beheading",
         ]
     )
     # Fetch hygiene for live sources (no effect on the simulated source).

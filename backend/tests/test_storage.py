@@ -96,6 +96,24 @@ def test_github_pages_updates_existing_file_idempotently(monkeypatch):
     assert put_payloads[0]["sha"] == "existing-sha"  # retry updates in place
 
 
+def test_github_pages_poll_fast_fails_on_403_with_status(monkeypatch):
+    # A 403 on the Pages host (Pages disabled/private) won't heal by polling —
+    # fail fast, and surface the status so the cause is diagnosable (not an opaque
+    # 2-minute "never went live").
+    monkeypatch.setattr(storage.time, "sleep", lambda *_: None)
+
+    def fake_get(url, **kw):
+        if "api.github.com" in url:
+            return FakeResp(404)  # no existing file
+        return FakeResp(403, text="Pages not enabled")
+
+    monkeypatch.setattr(storage.requests, "get", fake_get)
+    monkeypatch.setattr(storage.requests, "put", lambda url, **kw: FakeResp(201))
+    with pytest.raises(StorageError) as exc:
+        storage.publish(_gh_settings(), 7, b"png")
+    assert "403" in str(exc.value)
+
+
 def test_github_pages_raises_if_never_goes_live(monkeypatch):
     monkeypatch.setattr(storage.time, "sleep", lambda *_: None)
     monkeypatch.setattr(

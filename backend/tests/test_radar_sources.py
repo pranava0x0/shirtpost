@@ -75,7 +75,16 @@ def test_parse_wikipedia_bad_payload_returns_empty():
 def test_family_filter_blocks_and_allows():
     block = ["porn", "nsfw"]
     assert sources.is_family_safe("Barbie (film)", block) is True
-    assert sources.is_family_safe("Pornhub", block) is False  # substring match
+    # Substring (not word-boundary) so compound adult terms are caught — a safety
+    # filter over-blocks on purpose (missing "Pornhub" would be the worse error).
+    assert sources.is_family_safe("Pornhub", block) is False
+
+
+def test_execution_removed_from_default_blocklist():
+    from app.config import get_settings
+
+    # "execution" caused false positives ("code execution") and was removed.
+    assert sources.is_family_safe("Code execution", get_settings().family_blocklist) is True
 
 
 def test_collect_wikipedia_drops_family_unsafe(monkeypatch):

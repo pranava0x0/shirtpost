@@ -56,6 +56,12 @@ def _parse_volume(entry: object) -> tuple[int, str]:
         digits = re.sub(r"[^\d]", "", str(approx))
         if digits:
             return int(digits), "search_traffic"
+        # A real traffic estimate we couldn't parse (unexpected format) — surface
+        # it instead of silently flattening to the "no signal" placeholder.
+        logger.warning(
+            "google_trends approx_traffic %r had no digits — using presence placeholder",
+            approx,
+        )
     return 1, "presence"
 
 
@@ -148,15 +154,30 @@ def fetch_wikipedia() -> list[RawTrend]:
     url = f"{settings.wikipedia_top_api}/{day.year}/{day.month:02d}/{day.day:02d}"
     body = fetch.get(url)
     if body is None:
+        # Fetch itself failed (network / 4xx) — a coverage gap, NOT "no trends".
+        # Distinguished from an empty parse below so a broken source is visible.
+        logger.warning("radar source=wikipedia fetch failed url=%s — no trends this sweep", url)
         return []
     out = parse_wikipedia_top(body, settings.wikipedia_top_n)
-    logger.info("radar source=wikipedia parsed=%d", len(out))
+    if not out:
+        logger.warning(
+            "radar source=wikipedia fetched a body but parsed 0 trends url=%s "
+            "— possible API format change", url
+        )
+    else:
+        logger.info("radar source=wikipedia parsed=%d", len(out))
     return out
 
 
 def is_family_safe(term: str, blocklist: list[str]) -> bool:
-    """Cheap keyword gate: a trend is dropped if its term contains a blocklisted
-    word. A first-pass heuristic — an LLM classifier (deferred) would be better."""
+    """Cheap keyword gate: drop a trend if its term contains a blocklisted word.
+
+    Intentionally a *substring* match, not word-boundary: a safety filter must
+    err toward over-blocking, and word boundaries would miss compounds like
+    "Pornhub"/"pornstar" (`\\bporn\\b` doesn't match them) — a worse error than
+    dropping the occasional innocent "grape". The blocklist is tuned to avoid the
+    worst false positives (e.g. "execution" removed). A first-pass heuristic; an
+    LLM classifier (deferred) is the real fix. Drops are counted in `collect`."""
     low = term.lower()
     return not any(bad in low for bad in blocklist)
 
@@ -189,4 +210,9 @@ def collect(source_ids: list[str]) -> list[RawTrend]:
             logger.info(
                 "radar family filter dropped term=%r source=%s", row.term, row.source
             )
+    dropped = len(results) - len(kept)
+    if dropped:
+        # A count, not just per-item info lines — so an over-broad blocklist that
+        # is silently eating real trends is visible in the sweep summary.
+        logger.info("radar family filter dropped %d of %d trends", dropped, len(results))
     return kept

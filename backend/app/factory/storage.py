@@ -111,15 +111,37 @@ def _wait_until_live(
     settings: Settings, url: str, *, max_polls: int = 20, interval: float = 6.0
 ) -> None:
     """Poll the Pages URL until the file actually serves — a fresh deploy 404s for
-    ~1 min, and handing Printful a not-yet-live URL fails the mockup."""
-    for _ in range(max_polls):
+    ~1 min, and handing Printful a not-yet-live URL fails the mockup. Each attempt
+    is logged and the last status/error is surfaced in the raised error, so a
+    permanently-broken deploy (Pages disabled, wrong base URL) is diagnosable
+    rather than an opaque 2-minute timeout."""
+    last = "no response"
+    for attempt in range(max_polls):
         try:
             resp = requests.get(
                 url, headers={"User-Agent": settings.user_agent}, timeout=15
             )
             if resp.status_code == 200 and resp.content:
                 return
-        except requests.RequestException:
-            pass
+            last = f"HTTP {resp.status_code}"
+            # 404 is the expected not-yet-live case worth polling through; a 401/403
+            # (Pages disabled/private, bad host) will never heal — fail fast with body.
+            if resp.status_code in (401, 403):
+                raise StorageError(
+                    f"github pages URL {url} returned {resp.status_code}: "
+                    f"{resp.text[:200]} — Pages disabled/private or wrong "
+                    "GITHUB_PAGES_BASE_URL?"
+                )
+            logger.info(
+                "github pages not live yet url=%s attempt=%d status=%d",
+                url, attempt, resp.status_code,
+            )
+        except requests.RequestException as exc:
+            last = f"connection error: {exc}"
+            logger.warning(
+                "github pages poll error url=%s attempt=%d err=%s", url, attempt, exc
+            )
         time.sleep(interval)
-    raise StorageError(f"github pages file never went live after polling: {url}")
+    raise StorageError(
+        f"github pages file never went live after {max_polls} polls: {url} (last: {last})"
+    )
