@@ -54,6 +54,7 @@ Never blindly write code.
 - **Tree-shake and code-split.** Lazy-load what a page needs; don't bundle every controller everywhere.
 - **Benchmark against best-in-class.** If the simplest site in the org is orders of magnitude lighter, review the build.
 - **Document subsystems.** A `docs/` folder noting non-obvious subsystems, decisions, and correct CLI invocations. One line prevents repeated mistakes.
+- **Verify an external service's real contract before building on it — format, pricing, ToS.** A plausible-sounding assumption can be flatly wrong and leave the code dead on arrival: "Printful accepts our SVG print file" (it needs PNG), "X has a free API tier" (gone since 2026-02), "Reddit's free API is fine for a commercial app" (ToS-barred). One targeted doc/pricing/ToS check before committing to a pipeline shape saves a rebuild — and when the loop is keyless anyway, a dry-run that fails loud on the missing piece beats a "working" path built on the wrong contract. When you do rasterize/convert, prefer a toolkit's *bundled* asset (Pillow's scalable default font) over both a system lib (cairo/pango) and a committed font binary; and binary-search any "largest prefix that fits" scan — a per-unit decrement is O(n²) and quietly dominates runtime.
 
 ---
 

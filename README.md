@@ -70,15 +70,19 @@ production and dev output corrupts the chunk manifest. Use one or the other.
   **sparkline** per trend (not just the latest delta). Trends are grouped into
   **per-source lanes** — volumes aren't comparable across sources, so a within-source
   `normalized_hype` scales each lane instead of one misleading global ranking.
+- The Factory builds the SVG as a source artifact and **rasterizes a transparent PNG**
+  (Printful's DTG pipeline rejects SVG). Print ink color is derived from
+  `PRINTFUL_GARMENT_COLOR` for contrast, so art never prints white-on-white.
+- Broadcast defaults to **`X_BROADCAST_MODE=intent`** — the Studio shows a "Post to X"
+  button linking a prefilled `x.com/intent/post` (X has no free API tier; this is $0, no
+  keys). `=api` auto-posts via credentials and logs an estimated per-post cost.
 - The Factory **fails loud** (drop `status=failed`, `error` surfaced in the UI) until
-  Printful + X.com credentials *and* `PRINTFUL_PRINT_FILE_BASE_URL` (SVG hosting) are
-  configured. A failed drop can be **retried** from the UI; the pipeline resumes from the
-  last committed step and never re-posts a tweet it already sent. See [backlog.md](backlog.md).
-- Print ink color is derived from `PRINTFUL_GARMENT_COLOR` for contrast, so art never
-  prints white-on-white on a light garment.
+  Printful credentials *and* `PRINTFUL_PRINT_FILE_BASE_URL` (PNG hosting) are configured.
+  A failed drop can be **retried** from the UI; the pipeline resumes from the last committed
+  step and never re-posts a tweet it already sent. See [PLAN.md](docs/PLAN.md) / [backlog.md](backlog.md).
 - Set `FACTORY_DRY_RUN=true` to complete the loop **without** any external service:
-  drops reach `published` with clearly-marked simulated outputs (mockup = the served SVG,
-  `tweet dryrun-<id>`). Default off so a real misconfiguration still fails loud.
+  drops reach `published` with clearly-marked simulated outputs (mockup = the served PNG;
+  intent URL for the operator). Default off so a real misconfiguration still fails loud.
 
 ## Security
 

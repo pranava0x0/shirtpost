@@ -24,9 +24,10 @@
 
 ## Integration Services (The Factory)
 
-- [printful.py](backend/app/factory/printful.py): Printful client for SVG text mockups and store catalog sync, with XML-escaped payloads and garment-contrast ink selection.
-- [xcom.py](backend/app/factory/xcom.py): X.com client — v2 media upload then a v2 tweet carrying the media_id.
-- [pipeline.py](backend/app/factory/pipeline.py): Idempotent Factory pipeline invoked on admin submission — each external step commits as it lands and is skipped on retry, so a posted tweet is never sent twice.
+- [printful.py](backend/app/factory/printful.py): Printful client — builds the SVG source, generates mockups, syncs the store catalog; XML-escaped payloads and garment-contrast ink selection.
+- [render.py](backend/app/factory/render.py): Rasterizes the design copy to a transparent print-ready PNG with Pillow (Printful rejects SVG); bundled scalable font, no system libs.
+- [xcom.py](backend/app/factory/xcom.py): X.com — prefilled Web Intent URL (free default) and the v2 media-upload + tweet client for auto-post (`api`) mode.
+- [pipeline.py](backend/app/factory/pipeline.py): Idempotent Factory pipeline — builds SVG + PNG, Printful mockup/sync, then a mode-aware broadcast (intent/api); each step commits as it lands and is skipped on retry, so a posted tweet is never sent twice.
 
 ## Admin API
 

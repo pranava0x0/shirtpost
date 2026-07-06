@@ -17,10 +17,12 @@ The alternatives, if ever needed:
 
 ## Factory pipeline gaps
 
-- **Host the SVG print files** (priority: high). Printful's mockup generator fetches the print
-  file by public URL. The pipeline writes `artifacts/<drop_id>.svg` and fails loud until
-  `PRINTFUL_PRINT_FILE_BASE_URL` points at a reachable host (S3/R2/Cloudflare). Until then the
-  Factory cannot complete end-to-end.
+- **Host the PNG print files** (priority: high, PLAN.md 2A #2). The Factory now renders
+  `artifacts/<drop_id>.png` (Printful rejects SVG) and fails loud until
+  `PRINTFUL_PRINT_FILE_BASE_URL` points at a reachable host. Plan default is a **GitHub Pages
+  artifacts repo** ($0, no card; push the PNG, poll the URL until live); **Cloudflare R2** is the
+  upgrade path. Needs the artifacts repo created + a token — the last thing gating real-mode
+  Printful. Until then, dry-run serves the PNG locally.
 - **FastAPI + Starlette BadHost upgrade** (priority: high). Pin fastapi/starlette to the
   CVE-2026-48710-patched line once resolvable; confirm `starlette >= 1.0.1`. Interim mitigation
   (TrustedHostMiddleware) is in place. See `security.md`. **Blocked:** `starlette >= 1.0.1` is a
@@ -45,6 +47,12 @@ The alternatives, if ever needed:
 - ~~Garment-color safety~~ — `print_color_for_garment` derives ink from `PRINTFUL_GARMENT_COLOR`
   (light garment → dark ink, dark → white), so art never prints white-on-white. Unknown color logs
   a warning and defaults to white (safe for the black default variant).
+- ~~Printful rejects SVG~~ (PLAN.md 2A #1) — `factory/render.py` rasterizes a transparent print-ready
+  PNG with Pillow (bundled scalable font, no system cairo, no vendored binary); the SVG stays as the
+  source. Pipeline hosts/serves `<id>.png`. Real-mode hosting (above) is the remaining gate.
+- ~~X has no free API tier~~ (PLAN.md 2B) — `X_BROADCAST_MODE=intent` (default) generates a prefilled
+  `x.com/intent/post` URL the operator clicks ($0, no keys); `=api` keeps the metered auto-post path
+  (logs per-post cost). "Post to X" button in the Studio.
 
 - ~~Real source-adapter hardening~~ — `radar/fetch.py` adds disk caching, per-host rate limiting
   (>=1.5s), and 429 backoff.
@@ -68,9 +76,11 @@ The alternatives, if ever needed:
 
 ## Open follow-ups from the PR review
 
-- **Storefront URL + conversion path** (priority: high before any real X posting). Phase 1 has no
-  checkout, so the broadcast is a teaser. The code path exists (`STORE_BASE_URL` → shop link in the
-  broadcast); it stays a teaser until a real product/store URL + CTA is wired and a drop is buyable.
+- **Storefront URL + conversion path** (priority: high, PLAN.md 2B). The broadcast wiring is done
+  (`STORE_BASE_URL` → shop link in the intent/tweet copy), but it stays a *teaser* until a real
+  storefront exists. Plan default: a **Printful Quick Store** ($0, Stripe checkout) — validate that
+  an API-created sync product gets a shareable product URL (manual 30-min test), then store that URL
+  on the drop. Fallback: Shopify Starter (~$5/mo) or manual publish.
 - **Per-source rank normalization at scale** (priority: low). The lanes + `normalized_hype` land the
   honest within-source ranking. If sources later need cross-source triage (one merged action queue),
   add an explicit exposure-weighted score — never a bare `hype_score` compare across measurements.

@@ -4,19 +4,23 @@ _Last updated: 2026-07-05_
 
 ## Where things stand
 
-Phase 1 scaffold merged to `main` (PRs #1, #2). This branch adds **Phase 1.5** —
-four self-contained backlog items (observation history, idempotent retry,
-cross-source lanes, garment-color safety), verified end-to-end and delivered as
-a PR against `main`.
+Phase 1 scaffold merged to `main` (PRs #1, #2). This branch carries **Phase 1.5 +
+the code-doable, $0 parts of Phase 2A/2B** from [PLAN.md](PLAN.md): observation
+history, idempotent retry, cross-source lanes, garment-color safety, **PNG
+rasterization** (Printful rejects SVG), and **free X Web-Intent broadcast** (X has
+no free API tier). Delivered as a PR against `main`. Remaining plan work is
+human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
 ## Verified (all green, 2026-07-05)
 
-- Backend: `pytest` = **67 passed** on CPython 3.12 (was 30 at scaffold).
+- Backend: `pytest` = **79 passed** on CPython 3.12 (was 30 at scaffold).
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
   hype sparklines and within-source meters; `submit` → **fails loud** with the
   exact missing-config reason → **Retry drop** re-runs the *same* drop (no
-  duplicate) and, in dry-run, carries it to `published` with a served mockup.
+  duplicate) and, in dry-run, carries it to `published`. The Factory now renders
+  a real **transparent PNG** (served `image/png`, RGBA 1800×2400) and a published
+  drop shows a **"Post to X"** intent button with a valid, URL-encoded link.
   Mobile checked at 375px; no console errors.
 
 ## Improvements landed on the PR (second batch)
@@ -46,6 +50,17 @@ a PR against `main`.
   incomparable measurements.
 - **Garment-color safety** — ink derived from `PRINTFUL_GARMENT_COLOR` for
   contrast; never white-on-white on a light garment.
+
+## Phase 2A/2B ($0 corrections from PLAN.md — this branch)
+
+- **PNG rasterization** (2A #1) — research found Printful rejects SVG.
+  `factory/render.py` (Pillow, bundled scalable font — no system cairo, no
+  vendored binary) renders a transparent print-ready PNG; the SVG stays as the
+  source. Pipeline hosts/serves `<id>.png`. `pillow==12.3.0` (advisory-swept).
+- **Free X broadcast** (2B) — X has no free API tier since 2026-02.
+  `X_BROADCAST_MODE=intent` (default) generates a prefilled `x.com/intent/post`
+  URL the operator clicks — $0, no keys. `=api` keeps the auto-post path (logs an
+  estimated per-post cost). "Post to X" button in the Studio.
 
 ## Dev environment already provisioned (don't redo)
 
