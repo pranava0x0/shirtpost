@@ -1,6 +1,7 @@
 import { RadarControls } from "@/components/RadarControls";
 import { TrendCard } from "@/components/TrendCard";
 import { api } from "@/lib/api";
+import { sourceLabel } from "@/lib/sources";
 import type { Drop, Trend } from "@/lib/types";
 
 // Always render fresh — the radar updates Hype Scores in the background.
@@ -13,6 +14,20 @@ function latestDropByTrend(drops: Drop[]): Map<number, Drop> {
     if (!map.has(drop.trend_id)) map.set(drop.trend_id, drop);
   }
   return map;
+}
+
+// Group trends into per-source lanes, preserving the API's hype-desc order
+// within each. Volumes are not comparable across sources, so ranking them on one
+// global scale would imply a comparison that doesn't exist. Lane order is by the
+// hype of each source's top trend (trends already arrive hype-desc).
+function trendsBySource(trends: Trend[]): [string, Trend[]][] {
+  const lanes = new Map<string, Trend[]>();
+  for (const trend of trends) {
+    const lane = lanes.get(trend.source);
+    if (lane) lane.push(trend);
+    else lanes.set(trend.source, [trend]);
+  }
+  return [...lanes.entries()];
 }
 
 export default async function AdminPage() {
@@ -54,15 +69,27 @@ export default async function AdminPage() {
           No trends yet. The radar populates within one poll interval.
         </div>
       ) : (
-        <ul className="space-y-3">
-          {trends.map((trend) => (
-            <TrendCard
-              key={trend.id}
-              trend={trend}
-              latestDrop={latest.get(trend.id) ?? null}
-            />
+        <div className="space-y-8">
+          {trendsBySource(trends).map(([source, laneTrends]) => (
+            <section key={source} aria-label={`${sourceLabel(source)} trends`}>
+              <h2 className="mb-2 flex items-baseline gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                {sourceLabel(source)}
+                <span className="font-normal normal-case text-neutral-600">
+                  ranked within source
+                </span>
+              </h2>
+              <ul className="space-y-3">
+                {laneTrends.map((trend) => (
+                  <TrendCard
+                    key={trend.id}
+                    trend={trend}
+                    latestDrop={latest.get(trend.id) ?? null}
+                  />
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
     </main>
   );

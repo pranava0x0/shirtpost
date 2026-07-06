@@ -31,8 +31,11 @@ jobs:
           python-version: "3.12"
       - name: Create venv
         run: uv venv
-      - name: Install dependencies (pinned)
-        run: uv pip install -r requirements-dev.txt
+      - name: Install dependencies (hash-locked)
+        # --require-hashes rejects any package whose hash doesn't match the lock,
+        # closing the same-version-republish window. Regenerate the lock with:
+        #   uv pip compile requirements-dev.txt --universal --generate-hashes -o requirements-dev.lock
+        run: uv pip install --require-hashes -r requirements-dev.lock
       - name: Run tests
         run: uv run pytest -q
 

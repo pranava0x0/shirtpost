@@ -13,6 +13,7 @@ releases: ``data.id`` on the new endpoint, ``media_id_string`` on older ones).
 from __future__ import annotations
 
 import logging
+from urllib.parse import quote
 
 import requests
 from requests_oauthlib import OAuth1
@@ -23,8 +24,16 @@ logger = logging.getLogger(__name__)
 
 X_MEDIA_UPLOAD_URL = "https://api.twitter.com/2/media/upload"
 X_TWEETS_URL = "https://api.twitter.com/2/tweets"
+X_INTENT_URL = "https://x.com/intent/post"
 
 _REQUIRED = ("x_api_key", "x_api_secret", "x_access_token", "x_access_token_secret")
+
+
+def build_x_intent_url(text: str) -> str:
+    """Prefilled Web Intent URL — the free ($0, no API key) broadcast path. The
+    operator opens it and clicks Post. Intents can't attach media, but a linked
+    product page unfurls its mockup as a card, which covers the image."""
+    return f"{X_INTENT_URL}?text={quote(text)}"
 
 
 class XError(RuntimeError):

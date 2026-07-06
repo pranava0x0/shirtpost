@@ -20,8 +20,30 @@ class TrendOut(BaseModel):
     volume: int
     velocity: float
     hype_score: float
+    # Hype relative to *its own source* (0..1, min-max over all trends of that
+    # source). Volumes are NOT comparable across sources, so this is the honest
+    # within-lane scale for a bar; never a cross-source ranking. 1.0 when a
+    # source has a single trend. Derived at read time.
+    normalized_hype: float = 1.0
+    # Recent hype trajectory (oldest -> newest) for an inline sparkline. Derived
+    # from trend_observations at read time; capped, not the full history.
+    spark: list[float] = Field(default_factory=list)
     first_seen_at: datetime
     last_seen_at: datetime
+
+
+class TrendObservationOut(BaseModel):
+    """One append-only snapshot of a trend at a single sweep."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    trend_id: int
+    volume: int
+    velocity: float
+    hype_score: float
+    measurement: str
+    observed_at: datetime
 
 
 class DropOut(BaseModel):
@@ -35,6 +57,7 @@ class DropOut(BaseModel):
     printful_mockup_url: str | None
     printful_sync_product_id: str | None
     x_tweet_id: str | None
+    x_intent_url: str | None
     dry_run: bool
     created_at: datetime
     published_at: datetime | None

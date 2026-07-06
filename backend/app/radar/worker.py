@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.database import SessionLocal
-from app.models import Trend, utcnow
+from app.models import Trend, TrendObservation, utcnow
 from app.radar import scoring, sources
 
 logger = logging.getLogger(__name__)
@@ -34,33 +34,48 @@ def run_sweep_once() -> int:
                 )
                 if trend is None:
                     velocity = scoring.compute_velocity(0, item.volume, now, now)
-                    session.add(
-                        Trend(
-                            term=item.term,
-                            term_raw=item.term_raw,
-                            source=item.source,
-                            source_url=item.source_url,
-                            measurement=item.measurement,
-                            volume=item.volume,
-                            prev_volume=0,
-                            velocity=velocity,
-                            hype_score=scoring.hype_score(velocity, item.volume),
-                            first_seen_at=now,
-                            last_seen_at=now,
-                        )
+                    hype = scoring.hype_score(velocity, item.volume)
+                    trend = Trend(
+                        term=item.term,
+                        term_raw=item.term_raw,
+                        source=item.source,
+                        source_url=item.source_url,
+                        measurement=item.measurement,
+                        volume=item.volume,
+                        prev_volume=0,
+                        velocity=velocity,
+                        hype_score=hype,
+                        first_seen_at=now,
+                        last_seen_at=now,
                     )
+                    session.add(trend)
+                    session.flush()  # assign trend.id for the observation FK below
                 else:
                     velocity = scoring.compute_velocity(
                         trend.volume, item.volume, trend.last_seen_at, now
                     )
+                    hype = scoring.hype_score(velocity, item.volume)
                     trend.prev_volume = trend.volume
                     trend.volume = item.volume
                     trend.velocity = velocity
-                    trend.hype_score = scoring.hype_score(velocity, item.volume)
+                    trend.hype_score = hype
                     trend.measurement = item.measurement
                     trend.last_seen_at = now
                     if item.source_url:
                         trend.source_url = item.source_url
+                # Append-only snapshot for the velocity curve. Add by trend_id
+                # rather than trend.observations.append() so we never load the
+                # (unbounded, ever-growing) prior history on each sweep.
+                session.add(
+                    TrendObservation(
+                        trend_id=trend.id,
+                        volume=item.volume,
+                        velocity=velocity,
+                        hype_score=hype,
+                        measurement=item.measurement,
+                        observed_at=now,
+                    )
+                )
                 touched += 1
             except Exception as exc:  # per-record resilience
                 logger.exception("radar upsert failed term=%r: %s", item.term, exc)

@@ -194,6 +194,12 @@ One at a time. Don't grow into a queue — if you need stacked toasts, swap in a
 
 A matrix answers a binary question — "does this entity touch this dimension at all?" Render a single `✓` per populated cell, not a count. Volume belongs in the subsidiary list, not the at-a-glance grid; digits make the matrix harder to scan and over-state precision.
 
+### 8.7 Sparklines & meters
+
+A trend line at a glance is a hand-rolled inline `<svg>` `polyline`, not a charting library — a sparkline is ~20 lines of coordinate math, and a dependency for it is dead weight (§ 10, and CLAUDE.md "boring tech"). Scale the series to the box with min-max; a flat series draws a centered horizontal line, not nothing. It is a **lossy visual**, so it carries the exact latest value in `aria-label` ("Hype over 24 observations, latest 158,000") — a screen reader and a test both need the number the glyph stands for. Fewer than 2 points → render nothing (a one-point line is noise).
+
+A proportion bar (e.g. a within-group normalized score) is `role="meter"` with `aria-valuemin/max/now`, not a bare `<div>`. Fill width is the only thing that changes; keep the track visible so 0% still reads as "measured, low," not "missing." Never let the bar imply a comparison the data doesn't support — a bar is only honest *within* one comparable group (CLAUDE.md: lane incomparable series, don't rank them on one scale; and § 12.12 below).
+
 ---
 
 ## 9. Accessibility (baseline)
@@ -333,6 +339,14 @@ A browser serving an old `app.js` is the most common silent frontend failure —
 ### 12.11 Mobile collapse must be deterministic
 
 Don't drive a responsive show/hide off the `hidden` attribute or a native `<details open>` default alone — once restyled, their behavior is inconsistent across breakpoints. Drive open/closed from a `matchMedia` listener with an explicit `display: none` per breakpoint (collapsed on mobile, forced visible on desktop), so the state never rides on attribute quirks. (`<details>` is still the right primitive for *user-toggled* disclosure per § 7 — this is about *breakpoint-driven* collapse.)
+
+### 12.12 One sorted list of incomparable rows lies by layout
+
+A single hype-descending list that mixes rows whose numbers mean different things (a search-traffic estimate vs. a "present in feed" flag) tells the eye they're on one scale — the low-scale source always sinks to the bottom and reads as "least important." Group into labeled per-source lanes and rank within each; label the lane ("ranked within source"). A within-lane meter (§ 8.7) then compares only comparable things. The data-layer rule behind this lives in CLAUDE.md ("don't rank incomparable series on one scale").
+
+### 12.13 Scaled visuals must handle the zero-range (flat) case explicitly
+
+Any chart that normalizes values to a pixel range — sparkline, meter, bar, heat cell — divides by `(max − min)`. When every point is equal that span is 0, and the usual guard `span = max − min || 1` doesn't *center* the result, it maps every value to `1 − 0 = 1` → the far edge (a flat sparkline pinned to the bottom, not the middle). Special-case it: if `max === min`, place the flat line at the mid-line (`height / 2`) and the meter at whatever "no relative signal" should read as. Don't trust a comment that *claims* it's centered — compute the degenerate case and look. (This is the visual sibling of the data rule that a single observation normalizes to 1.0, not 0.)
 
 ---
 

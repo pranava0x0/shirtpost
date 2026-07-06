@@ -11,6 +11,7 @@ time if the credentials it needs are absent.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,10 +42,31 @@ class Settings(BaseSettings):
     radar_poll_interval_seconds: int = Field(default=900, ge=30)
     radar_sources: list[str] = Field(
         default=["simulated"],
-        description='Enabled source ids: "simulated", "google_trends", "reddit".',
+        # "wikipedia" is the ToS-clean real source (open pageviews API, no key).
+        # Reddit was dropped (its free API forbids commercial use). Google Trends
+        # has no sanctioned feed until the alpha API is granted — apply for it.
+        description='Enabled source ids: "simulated", "wikipedia", "google_trends".',
     )
     google_trends_rss_url: str = "https://trends.google.com/trending/rss?geo=US"
-    reddit_rss_url: str = "https://www.reddit.com/r/popular/.rss"
+    # Wikipedia most-viewed articles — free, open, ToS-clean. Date is appended as
+    # /YYYY/MM/DD at fetch time (data lags ~1 day, so the radar reads yesterday).
+    wikipedia_top_api: str = (
+        "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access"
+    )
+    wikipedia_top_n: int = Field(default=25, ge=1, le=100)
+    # Family-friendly gate (Phase 3 #5). A cheap keyword blocklist that drops a
+    # trend before it reaches the queue; a stronger LLM classifier is deferred.
+    family_safe_filter_enabled: bool = True
+    # Substring-matched (see is_family_safe — a safety filter over-blocks on
+    # purpose). Tuned to avoid the worst false positives: "execution" was dropped
+    # (too common in innocent "code execution"); "beheading" covers the violent case.
+    family_blocklist: list[str] = Field(
+        default=[
+            "porn", "pornographic", "nsfw", "xxx", "nude", "onlyfans",
+            "rape", "massacre", "genocide", "terrorist attack", "mass shooting",
+            "suicide", "beheading",
+        ]
+    )
     # Fetch hygiene for live sources (no effect on the simulated source).
     radar_min_request_interval_seconds: float = Field(default=1.5, ge=0.0)
     radar_feed_cache_seconds: int = Field(default=300, ge=0)
@@ -57,11 +79,22 @@ class Settings(BaseSettings):
     # Baseline blank: a standard unisex t-shirt. Override per the Printful catalog.
     printful_default_product_id: int = 71
     printful_default_variant_id: int = 4012
-    # Printful's mockup generator fetches the print file by public URL, so the
-    # generated SVG must be hosted somewhere Printful can reach. Base URL of that
-    # host; the pipeline appends "/<drop_id>.svg". Unset => Factory fails loud.
-    printful_print_file_base_url: str | None = None
+    # Garment color the print sits on. Drives the print *text* color for contrast:
+    # a light garment gets dark ink, a dark garment gets white. Default variant
+    # 4012 is black, so the print defaults to white. Change this whenever you
+    # change the variant, or the art can vanish into the shirt (white-on-white).
+    # Accepts a common color name ("black", "navy", "sport grey") or a #RRGGBB hex.
+    printful_garment_color: str = "black"
     artifacts_dir: str = "artifacts"
+
+    # --- Print-file storage (host the PNG for Printful to fetch by URL) ------
+    # "local" (default): serve from this backend at PUBLIC_BASE_URL/artifacts/<id>.png
+    # (fails loud if PUBLIC_BASE_URL is localhost — Printful can't reach it).
+    # "github_pages": push to a public artifacts repo + poll until live ($0, no card).
+    print_file_storage: Literal["local", "github_pages"] = "local"
+    github_artifacts_repo: str | None = None  # "owner/repo"
+    github_token: str | None = None
+    github_pages_base_url: str | None = None  # e.g. https://<user>.github.io/<repo>
     # Dry-run: complete the Factory pipeline without Printful/X (dev/demo). Outputs
     # are clearly marked simulated. Default off so a real misconfig still fails loud.
     factory_dry_run: bool = False
@@ -73,7 +106,16 @@ class Settings(BaseSettings):
     # the post is a teaser, never a "live"/buyable claim.
     store_base_url: str | None = None
 
-    # --- X.com (OAuth 1.0a user context: required for v1.1 media + v2 tweets) -
+    # --- X.com broadcast ----------------------------------------------------
+    # X has no free API tier since 2026-02 (~$0.20/post with a URL). Default to
+    # "intent": the Factory generates a prefilled x.com/intent/post URL and the
+    # operator clicks Post ($0, no keys). "api" auto-posts via the credentials
+    # below (metered — logs an estimated per-post cost).
+    x_broadcast_mode: Literal["intent", "api"] = "intent"
+    # Fail-loud spend cap for api mode: refuse to auto-post if this month's posts
+    # (counted conservatively at the URL rate) would exceed this. Unset = no cap.
+    x_monthly_budget_usd: float | None = Field(default=None, ge=0)
+    # OAuth 1.0a user context — only needed when x_broadcast_mode="api".
     x_api_key: str | None = None
     x_api_secret: str | None = None
     x_access_token: str | None = None

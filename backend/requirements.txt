@@ -1,5 +1,11 @@
 # Pinned exact (==) per CLAUDE.md supply-chain hardening. Install with:
 #   pip install -r requirements.txt
+# This file is the source of truth for direct deps. requirements.lock /
+# requirements-dev.lock are the hash-locked, fully-resolved sets CI installs with
+# `--require-hashes`. After editing this file, regenerate them (--universal keeps
+# platform-conditional deps like greenlet pinned so the Linux CI install works):
+#   uv pip compile requirements.txt     --universal --generate-hashes -o requirements.lock
+#   uv pip compile requirements-dev.txt --universal --generate-hashes -o requirements-dev.lock
 # Security note (see security.md): CVE-2026-48710 "BadHost" affects starlette
 # < 1.0.1. The interim mitigation is TrustedHostMiddleware (wired in main.py).
 # Before production, upgrade fastapi+starlette to the BadHost-patched line and
@@ -15,3 +21,6 @@ requests==2.32.3
 requests-oauthlib==2.0.0
 beautifulsoup4==4.12.3
 feedparser==6.0.11
+# Rasterizes the SVG print source to a transparent PNG for Printful (which rejects
+# SVG). Uses Pillow's bundled scalable font — no system cairo, no vendored binary.
+pillow==12.3.0

@@ -3,6 +3,20 @@
 Source: https://pranava0x0.github.io/vibe-coding-security/llms-ctx.txt
 Refresh if > 7 days old, or before any new dependency add / scaffold / CDN asset / GitHub Action / fetched install script.
 
+## Sweep 2026-07-05 — Phase 2A raster dependency
+
+Triggered by: adding `pillow` to `backend/requirements.txt` for SVG→PNG rasterization
+(Printful rejects SVG). Advisory index fetched 2026-07-06.
+
+- **`pillow==12.3.0`** — NOT named in the index. Cleared for use. Pinned exact. Uses
+  Pillow's bundled scalable default font, so no system `cairo`/`pango` and no vendored
+  font binary enter the tree (keeps the "no committed binaries" rule intact).
+- Also re-checked (still clean, unchanged from below): the Starlette **BadHost**
+  (CVE-2026-48710) remains the only stack-relevant advisory; `TrustedHostMiddleware`
+  mitigation stays. No new matches against the existing manifest.
+- Not adding `boto3`/`cairosvg`/`resvg` this pass (R2 backend deferred; Pillow chosen
+  over cairosvg to avoid system libs). Re-sweep before adding any of them.
+
 ## Sweep 2026-06-19 — Phase 1 scaffold
 
 Triggered by: new-project scaffold + initial dependency manifests (`requirements.txt`, `package.json`).

@@ -17,24 +17,49 @@ The alternatives, if ever needed:
 
 ## Factory pipeline gaps
 
-- **Host the SVG print files** (priority: high). Printful's mockup generator fetches the print
-  file by public URL. The pipeline writes `artifacts/<drop_id>.svg` and fails loud until
-  `PRINTFUL_PRINT_FILE_BASE_URL` points at a reachable host (S3/R2/Cloudflare). Until then the
-  Factory cannot complete end-to-end.
+- **Real-mode Printful hosting setup** (priority: high — a human step, not code, PLAN.md 2A #2/#3).
+  The storage code is done (`PRINT_FILE_STORAGE=local|github_pages`); what's left is external:
+  create the GitHub Pages artifacts repo + a token (or deploy so `local` is publicly reachable),
+  and a free Printful account to exercise live. Until hosting is reachable, submissions fail loud.
+  **Cloudflare R2** (boto3 + a card) is the deferred storage upgrade.
 - **FastAPI + Starlette BadHost upgrade** (priority: high). Pin fastapi/starlette to the
   CVE-2026-48710-patched line once resolvable; confirm `starlette >= 1.0.1`. Interim mitigation
-  (TrustedHostMiddleware) is in place. See `security.md`.
-- **Trend observation history** (priority: medium). Current model stores only latest + prev
-  volume per trend. An append-only `trend_observations` table would give true velocity curves
-  and charts instead of a single delta.
-- **Lock files / hash-locked installs** (priority: medium). The frontend commits
-  `package-lock.json` (CI uses `npm ci`); add `uv lock` / `pip-compile --generate-hashes` for the
-  backend and install with `--require-hashes`.
-- **Pipeline retries + idempotency** (priority: medium). A failed drop should be safely
-  re-runnable without double-posting to X.com (dedup by drop id / store the tweet attempt). The
-  409 in-flight guard prevents concurrent double-fires but not retry-after-failure dedup.
+  (TrustedHostMiddleware) is in place. See `security.md`. **Blocked:** `starlette >= 1.0.1` is a
+  major jump incompatible with the pinned `fastapi==0.115.6` (needs `starlette < 0.42`); do it as
+  a coordinated fastapi+starlette upgrade with a fresh advisory sweep, not a lone bump.
 
 ## Done (was here, now implemented)
+
+- ~~Print-file storage~~ (PLAN.md 2A #2) — `factory/storage.py`: `local` (serve from this backend,
+  fails loud on localhost) + `github_pages` (push to a public artifacts repo + poll until live,
+  idempotent via blob sha). Replaced the `PRINTFUL_PRINT_FILE_BASE_URL` assumption. R2 deferred.
+- ~~Real ToS-clean source + family filter~~ (PLAN.md 3 #2/#5) — `wikipedia` most-viewed articles
+  (open pageviews API, no key); Reddit dropped (commercial ToS); a keyword blocklist drops
+  family-unsafe trends before the queue (an LLM classifier would be stronger — deferred).
+- ~~X monthly budget guard~~ (PLAN.md 2B) — `X_MONTHLY_BUDGET_USD` refuses an api-mode auto-post
+  that would exceed the month's cap (conservative count). Free intent mode is unaffected.
+- ~~Lock files / hash-locked installs~~ (PLAN.md 4 #4) — `requirements.lock` / `requirements-dev.lock`
+  (`uv pip compile --generate-hashes`); CI installs with `--require-hashes`.
+
+- ~~Trend observation history~~ — append-only `trend_observations` table; the worker writes one
+  snapshot per sweep (`worker.py`), `GET /api/trends/{id}/observations` serves the history, and each
+  `/trends` row carries a `spark` series the Studio draws as an inline sparkline.
+- ~~Pipeline retries + idempotency~~ — each external step commits as it lands and is skipped when its
+  result is already present, so a retry RESUMES; the tweet id is committed before the published
+  transition so a crash-after-post can't double-tweet. `POST /api/drops/{id}/retry` + a UI button
+  reserve the in-flight slot (unique index) and re-run. Unit tests cover no-double-post + resume.
+- ~~True cross-source normalization~~ — trends group into per-source lanes in the Studio, each ranked
+  within its own source; `normalized_hype` (0..1, min-max over a source's population) is the honest
+  within-lane scale. Volumes are never ranked on one global scale across incomparable measurements.
+- ~~Garment-color safety~~ — `print_color_for_garment` derives ink from `PRINTFUL_GARMENT_COLOR`
+  (light garment → dark ink, dark → white), so art never prints white-on-white. Unknown color logs
+  a warning and defaults to white (safe for the black default variant).
+- ~~Printful rejects SVG~~ (PLAN.md 2A #1) — `factory/render.py` rasterizes a transparent print-ready
+  PNG with Pillow (bundled scalable font, no system cairo, no vendored binary); the SVG stays as the
+  source. Pipeline hosts/serves `<id>.png`. Real-mode hosting (above) is the remaining gate.
+- ~~X has no free API tier~~ (PLAN.md 2B) — `X_BROADCAST_MODE=intent` (default) generates a prefilled
+  `x.com/intent/post` URL the operator clicks ($0, no keys); `=api` keeps the metered auto-post path
+  (logs per-post cost). "Post to X" button in the Studio.
 
 - ~~Real source-adapter hardening~~ — `radar/fetch.py` adds disk caching, per-host rate limiting
   (>=1.5s), and 429 backoff.
@@ -58,14 +83,27 @@ The alternatives, if ever needed:
 
 ## Open follow-ups from the PR review
 
-- **True cross-source normalization** (priority: medium). The `measurement` field stops the UI from
-  *implying* comparability, but the global queue still ranks all sources by one `hype_score`. Add
-  per-source normalization or separate ranking lanes before mixing real sources.
-- **Storefront URL + conversion path** (priority: high before any real X posting). Phase 1 has no
-  checkout, so the broadcast is a teaser. Wire a real product/store URL + CTA and don't announce a
-  buyable drop until one exists.
-- **Garment-color safety** (priority: low). `build_text_svg` fill defaults to white, which assumes a
-  dark garment (the default variant is black). Tie the print color to the selected variant's color.
+- **Storefront URL + conversion path** (priority: high, PLAN.md 2B). The broadcast wiring is done
+  (`STORE_BASE_URL` → shop link in the intent/tweet copy), but it stays a *teaser* until a real
+  storefront exists. Plan default: a **Printful Quick Store** ($0, Stripe checkout) — validate that
+  an API-created sync product gets a shareable product URL (manual 30-min test), then store that URL
+  on the drop. Fallback: Shopify Starter (~$5/mo) or manual publish.
+- **Per-source rank normalization at scale** (priority: low). The lanes + `normalized_hype` land the
+  honest within-source ranking. If sources later need cross-source triage (one merged action queue),
+  add an explicit exposure-weighted score — never a bare `hype_score` compare across measurements.
+
+## Open follow-ups from code review (2026-07-06)
+
+- **LLM family-safe classifier** (priority: medium, PLAN.md 3 #5). The keyword blocklist over-blocks
+  ("grape harvest") and can't judge context ("Suicide Squad (film)"). A Haiku pass cached by content
+  hash, gated behind the keyword filter, is the real fix — deferred (needs an API key + cost budget).
+- **Wikipedia date fallback** (priority: low). The source reads `-1 day`; if that day's pageviews
+  aren't published yet the source is empty that sweep (now logged). Try `-2` on a 404.
+- **github_pages: webhook over 2-min poll** (priority: low). `_wait_until_live` blocks a worker thread
+  up to ~2 min on a first publish (Pages deploy lag). Fine for a single operator; a Pages-deploy
+  webhook would free the thread if throughput ever matters. See `issues.md`.
+- **Per-source sweep coverage counts** (priority: low). `run_sweep_once` logs a single `touched=N`;
+  a per-source `fetched/parsed/dropped` line would make a silently-failing source obvious at a glance.
 
 ## Phase 2+
 

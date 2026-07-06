@@ -79,7 +79,14 @@ def get(url: str) -> str | None:
                 url, headers={"User-Agent": settings.user_agent}, timeout=15
             )
         except requests.RequestException as exc:
-            logger.warning("radar fetch error url=%s attempt=%d err=%s", url, attempt, exc)
+            # A down/refusing host: back off like a 429 instead of burning every
+            # retry in a tight burst, so a transient blip is ridden through.
+            logger.warning(
+                "radar fetch error url=%s attempt=%d err=%s; backing off %.0fs",
+                url, attempt, exc, backoff,
+            )
+            time.sleep(backoff)
+            backoff *= 2
             continue
         if resp.status_code == 429:
             logger.warning("radar 429 url=%s; backing off %.0fs", url, backoff)

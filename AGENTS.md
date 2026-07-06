@@ -119,6 +119,10 @@ Default verification matrix (project-specific `AGENTS.md` should override with c
 
 **Run a build/codegen script twice to assert idempotency** — the second run must inject identical bytes.
 
+**To verify a fail-loud external pipeline, boot it twice.** A pipeline that fails loud without credentials has two truths to see: run it in **real mode** (no creds) to watch it fail with the exact reason and expose the error/retry UI, then flip the project's **dry-run** flag and re-run to watch the happy path complete without external calls. One boot only ever shows half the behavior. A resumable retry is proven by re-running the *same* record and asserting no duplicate is created (count unchanged) and no external call re-fires.
+
+**Seed the time-series before verifying a visualization that reads it.** A sparkline/chart backed by an append-only history table renders empty until ≥2 observations exist — trigger the ingest (e.g. hit the sweep endpoint N times) *before* screenshotting, or you can't tell "feature broken" from "no data yet." Read the API payload (`curl … | python -m json.tool`) to confirm the series is populated, then check the UI.
+
 **Spot-check source URLs by status** before committing externally-sourced records: `curl -s -o /dev/null -w "%{http_code}" -L -A "Mozilla/5.0..." <url>`. A 403 (bot-blocker) is inconclusive — keep it; a 404 is dead — drop or replace.
 
 ---
@@ -162,6 +166,10 @@ This is a schema change. **Don't do this casually.** Steps:
 ### Handling PR review comments
 
 A PR in **"COMMENTED"** state means action required, not FYI. Fetch full review bodies (not the summary line), treat any user-provided link as authoritative, extract a checklist of each distinct issue, and verify the specific flow each names — not just the happy path. The merge is the start of addressing feedback, not the end.
+
+### Reviewing your own PR
+
+To review code you wrote, spawn **independent reviewer agents with distinct lenses** (a correctness/logic pass and a silent-failure/error-handling pass) rather than re-reading it yourself — author bias skips the same lines twice. Give each the exact diff scope (`git diff main...HEAD`), the highest-risk files, and "report findings, don't fix." They read the committed diff, so you can keep editing your working tree while they run. Then **critically evaluate every finding before applying it** — a suggested fix can be wrong for the context: on ShirtPost a reviewer proposed word-boundary matching for the family-safe filter, which would have *weakened* a safety gate (`\bporn\b` misses "Pornhub"), so the right move was to keep substring matching and document why. Log the confirmed bugs (root cause + fix + commit + regression test) in `issues.md`; that file is what the review is *for*.
 
 ### Driving a browser to scrape (Chrome / Playwright MCP)
 

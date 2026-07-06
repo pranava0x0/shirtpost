@@ -25,16 +25,32 @@ def _seed_drop(session) -> Drop:
 
 
 def test_dry_run_publishes_without_external_calls():
+    # Default broadcast mode is "intent": the drop gets a prefilled Post-to-X URL
+    # for the operator to click, not an auto-posted (fake) tweet id.
     with SessionLocal() as session:
         drop = _seed_drop(session)
         FactoryPipeline(Settings(factory_dry_run=True)).run(session, drop)
         session.refresh(drop)
         assert drop.status == DropStatus.PUBLISHED
         assert drop.dry_run is True
-        assert drop.x_tweet_id.startswith("dryrun-")
+        assert drop.x_tweet_id is None
+        assert drop.x_intent_url and drop.x_intent_url.startswith("https://x.com/intent/post")
         assert drop.printful_sync_product_id.startswith("dryrun-")
-        assert drop.printful_mockup_url.endswith(f"/artifacts/{drop.id}.svg")
+        # Printful rejects SVG -> the served/mockup artifact is the rasterized PNG.
+        assert drop.printful_mockup_url.endswith(f"/artifacts/{drop.id}.png")
         assert drop.error is None
+
+
+def test_dry_run_api_mode_simulates_a_tweet():
+    with SessionLocal() as session:
+        drop = _seed_drop(session)
+        FactoryPipeline(Settings(factory_dry_run=True, x_broadcast_mode="api")).run(
+            session, drop
+        )
+        session.refresh(drop)
+        assert drop.status == DropStatus.PUBLISHED
+        assert drop.x_tweet_id.startswith("dryrun-")
+        assert drop.x_intent_url is None  # api mode auto-posts, no manual intent URL
 
 
 def test_broadcast_copy_no_storefront_is_not_a_live_claim():
@@ -52,7 +68,8 @@ def test_broadcast_copy_reserves_room_for_shop_url():
 
 
 def test_real_mode_fails_loud_without_config():
-    # Default (dry-run off) with no Printful host/creds must still fail loud.
+    # Default (dry-run off) with local storage but a localhost PUBLIC_BASE_URL
+    # must fail loud — Printful can't fetch a print file from localhost.
     with SessionLocal() as session:
         drop = _seed_drop(session)
         try:
@@ -62,4 +79,4 @@ def test_real_mode_fails_loud_without_config():
         session.refresh(drop)
         assert drop.status == DropStatus.FAILED
         assert drop.dry_run is False
-        assert "PRINTFUL_PRINT_FILE_BASE_URL" in (drop.error or "")
+        assert "localhost" in (drop.error or "").lower()
