@@ -16,6 +16,7 @@ import requests
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.factory import storage
 from app.factory.printful import PrintfulClient
 from app.factory.render import render_text_png
 from app.factory.xcom import XClient, build_x_intent_url
@@ -27,10 +28,6 @@ _X_POST_COST_URL = 0.20
 _X_POST_COST_PLAIN = 0.015
 
 logger = logging.getLogger(__name__)
-
-
-class FactoryError(RuntimeError):
-    pass
 
 
 class FactoryPipeline:
@@ -49,9 +46,8 @@ class FactoryPipeline:
             garment = self._settings.printful_garment_color
             svg = PrintfulClient.build_text_svg(drop.design_copy, garment_color=garment)
             self._write_artifact(drop.id, "svg", svg.encode("utf-8"))
-            png_path = self._write_artifact(
-                drop.id, "png", render_text_png(drop.design_copy, garment_color=garment)
-            )
+            png = render_text_png(drop.design_copy, garment_color=garment)
+            self._write_artifact(drop.id, "png", png)
 
             # Dry-run: complete the loop without any external service. Mark every
             # output as simulated so it can never be mistaken for a real publish.
@@ -67,14 +63,9 @@ class FactoryPipeline:
                 logger.info("drop %s DRY RUN published (no external calls)", drop.id)
                 return drop
 
-            base = self._settings.printful_print_file_base_url
-            if not base:
-                raise FactoryError(
-                    "PRINTFUL_PRINT_FILE_BASE_URL is not set. Printful must fetch the "
-                    f"print file by public URL. PNG saved to {png_path}; host it and "
-                    "set the base URL to continue."
-                )
-            print_file_url = f"{base.rstrip('/')}/{drop.id}.png"
+            # 2. Host the PNG somewhere Printful can fetch it by URL (local /
+            # github_pages). Fails loud if hosting isn't reachable.
+            print_file_url = storage.publish(self._settings, drop.id, png)
 
             printful = PrintfulClient(self._settings)
 
@@ -82,13 +73,13 @@ class FactoryPipeline:
             # already present, so retrying a failed drop RESUMES rather than
             # repeats — critically, it never posts a second tweet (see _broadcast).
 
-            # 2. Printful mockup.
+            # 3. Printful mockup.
             if not drop.printful_mockup_url:
                 drop.printful_mockup_url = printful.generate_mockup(print_file_url)
                 session.commit()
             mockup_url = drop.printful_mockup_url
 
-            # 3. Printful catalog sync.
+            # 4. Printful catalog sync.
             if not drop.printful_sync_product_id:
                 drop.printful_sync_product_id = printful.sync_product(
                     name=f"ShirtPost — {trend.term}",
@@ -97,7 +88,7 @@ class FactoryPipeline:
                 )
                 session.commit()
 
-            # 4. Broadcast (intent = free, or api = auto-post).
+            # 5. Broadcast (intent = free, or api = auto-post).
             self._broadcast(session, drop, trend, mockup_url=mockup_url, simulate=False)
 
             drop.status = DropStatus.PUBLISHED

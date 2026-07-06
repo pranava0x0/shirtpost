@@ -82,11 +82,16 @@ class Settings(BaseSettings):
     # change the variant, or the art can vanish into the shirt (white-on-white).
     # Accepts a common color name ("black", "navy", "sport grey") or a #RRGGBB hex.
     printful_garment_color: str = "black"
-    # Printful's mockup generator fetches the print file by public URL, so the
-    # generated SVG must be hosted somewhere Printful can reach. Base URL of that
-    # host; the pipeline appends "/<drop_id>.svg". Unset => Factory fails loud.
-    printful_print_file_base_url: str | None = None
     artifacts_dir: str = "artifacts"
+
+    # --- Print-file storage (host the PNG for Printful to fetch by URL) ------
+    # "local" (default): serve from this backend at PUBLIC_BASE_URL/artifacts/<id>.png
+    # (fails loud if PUBLIC_BASE_URL is localhost — Printful can't reach it).
+    # "github_pages": push to a public artifacts repo + poll until live ($0, no card).
+    print_file_storage: Literal["local", "github_pages"] = "local"
+    github_artifacts_repo: str | None = None  # "owner/repo"
+    github_token: str | None = None
+    github_pages_base_url: str | None = None  # e.g. https://<user>.github.io/<repo>
     # Dry-run: complete the Factory pipeline without Printful/X (dev/demo). Outputs
     # are clearly marked simulated. Default off so a real misconfig still fails loud.
     factory_dry_run: bool = False

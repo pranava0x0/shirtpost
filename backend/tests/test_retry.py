@@ -23,7 +23,10 @@ def _real_mode_settings() -> Settings:
     # never-double-post-on-retry guarantee (intent mode makes no external call).
     return Settings(
         printful_api_key="k",
-        printful_print_file_base_url="https://cdn.example.com/prints",
+        # local storage + a public base URL -> publish() returns a URL without
+        # any network (the Printful/X clients are patched in these tests).
+        print_file_storage="local",
+        public_base_url="https://cdn.example.com",
         x_broadcast_mode="api",
         x_api_key="a",
         x_api_secret="b",

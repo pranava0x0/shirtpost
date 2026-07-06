@@ -68,7 +68,8 @@ def test_broadcast_copy_reserves_room_for_shop_url():
 
 
 def test_real_mode_fails_loud_without_config():
-    # Default (dry-run off) with no Printful host/creds must still fail loud.
+    # Default (dry-run off) with local storage but a localhost PUBLIC_BASE_URL
+    # must fail loud — Printful can't fetch a print file from localhost.
     with SessionLocal() as session:
         drop = _seed_drop(session)
         try:
@@ -78,4 +79,4 @@ def test_real_mode_fails_loud_without_config():
         session.refresh(drop)
         assert drop.status == DropStatus.FAILED
         assert drop.dry_run is False
-        assert "PRINTFUL_PRINT_FILE_BASE_URL" in (drop.error or "")
+        assert "localhost" in (drop.error or "").lower()
