@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 
 import requests
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
@@ -149,12 +150,37 @@ class FactoryPipeline:
         if simulate:  # dry-run + api mode
             drop.x_tweet_id = f"dryrun-{drop.id}"
         else:
+            self._enforce_x_budget(session)
             x = XClient(self._settings)
             media_id = x.upload_media(self._download(mockup_url))
             drop.x_tweet_id = x.post_tweet(text, media_id=media_id)
             cost = _X_POST_COST_URL if self._product_url(drop) else _X_POST_COST_PLAIN
             logger.info("drop %s auto-posted to X (est cost ~$%.3f)", drop.id, cost)
         session.commit()
+
+    def _enforce_x_budget(self, session: Session) -> None:
+        """Fail loud before an api post if this month's spend would exceed the
+        cap. Counts this month's real (non-dry-run) tweets at the URL rate — a
+        conservative estimate that errs toward not overspending."""
+        budget = self._settings.x_monthly_budget_usd
+        if budget is None:
+            return
+        month_start = utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        posted = session.scalar(
+            select(func.count())
+            .select_from(Drop)
+            .where(
+                Drop.x_tweet_id.is_not(None),
+                Drop.dry_run.is_(False),
+                Drop.published_at >= month_start,
+            )
+        )
+        projected = (posted + 1) * _X_POST_COST_URL
+        if projected > budget:
+            raise RuntimeError(
+                f"X monthly budget ${budget:.2f} would be exceeded: {posted} post(s) "
+                f"already this month, next would reach ~${projected:.2f}. Not posting."
+            )
 
     @staticmethod
     def _broadcast_copy(term: str, product_url: str | None = None) -> str:

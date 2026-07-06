@@ -3,6 +3,8 @@ x.com/intent/post URL the operator clicks — no API key, no metered post."""
 
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+
 from app.config import Settings
 from app.database import SessionLocal
 from app.factory.pipeline import FactoryPipeline
@@ -65,3 +67,37 @@ def test_intent_url_is_idempotent_across_retries():
         pipe.run(session, drop)
         session.refresh(drop)
         assert drop.x_intent_url == first
+
+
+# --- api-mode monthly budget guard -------------------------------------------
+
+
+def _post_this_month(session, trend_id: int) -> None:
+    session.add(
+        Drop(trend_id=trend_id, design_copy="x", status=DropStatus.PUBLISHED,
+             x_tweet_id="123", dry_run=False, published_at=utcnow())
+    )
+    session.commit()
+
+
+def test_x_budget_guard_blocks_over_cap():
+    with SessionLocal() as session:
+        drop = _seed_drop(session)
+        _post_this_month(session, drop.trend_id)  # one real post already this month
+        pipe = FactoryPipeline(Settings(x_broadcast_mode="api", x_monthly_budget_usd=0.20))
+        with pytest.raises(RuntimeError) as exc:
+            pipe._enforce_x_budget(session)
+        assert "budget" in str(exc.value).lower()
+
+
+def test_x_budget_guard_allows_under_cap():
+    with SessionLocal() as session:
+        # No posts yet this month; one post (~$0.20) is under a $1 cap.
+        FactoryPipeline(
+            Settings(x_broadcast_mode="api", x_monthly_budget_usd=1.00)
+        )._enforce_x_budget(session)  # must not raise
+
+
+def test_x_budget_guard_is_noop_without_a_cap():
+    with SessionLocal() as session:
+        FactoryPipeline(Settings(x_broadcast_mode="api"))._enforce_x_budget(session)

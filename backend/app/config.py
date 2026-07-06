@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     # operator clicks Post ($0, no keys). "api" auto-posts via the credentials
     # below (metered — logs an estimated per-post cost).
     x_broadcast_mode: Literal["intent", "api"] = "intent"
+    # Fail-loud spend cap for api mode: refuse to auto-post if this month's posts
+    # (counted conservatively at the URL rate) would exceed this. Unset = no cap.
+    x_monthly_budget_usd: float | None = Field(default=None, ge=0)
     # OAuth 1.0a user context — only needed when x_broadcast_mode="api".
     x_api_key: str | None = None
     x_api_secret: str | None = None
