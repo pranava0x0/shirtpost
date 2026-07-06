@@ -3,8 +3,8 @@ name: update-docs
 description: >-
   Update the ShirtPost documentation set so it stays consistent with the code
   after a chunk of work. Covers CLAUDE.md, AGENTS.md, DESIGN.md, README.md,
-  llms.txt, backlog.md, issues.md, docs/STATUS.md, docs/PLAN.md,
-  docs/SESSION-HISTORY.md, and backend/.env.example. Use this whenever the user
+  llms.txt, backlog.md, issues.md, docs/STATUS.md, and backend/.env.example. Use
+  this whenever the user
   says "update the docs", "update documentation", "sync the docs", "document
   this session/PR", "log this bug", or finishes a feature/fix/review and the docs
   should reflect it — even if they name only one doc, because touching one almost
@@ -48,9 +48,13 @@ Touch what the change implies; skip the rest. A bug fix ≠ a feature ≠ a lear
 | `backlog.md` | Deferred work | An item shipped (move to **Done**, ~~strikethrough~~ + what shipped) or the work surfaced a new follow-up. Demote stale "high". |
 | `issues.md` | Bug audit trail | Any bug was fixed (see the entry format below). Also log accepted limitations so they aren't "rediscovered." |
 | `docs/STATUS.md` | Resume point (read first next session) | Always, for substantive work: bump "Last updated", the **verified test count** (the number you just ran), what's done, and the next-up gaps (remove what's built; renumber). |
-| `docs/PLAN.md` | Build-out plan | Update the **Progress banner** (mark ✓, move newly-human-gated items). Leave the historical plan text as-is — it's the record of what was planned. |
-| `docs/SESSION-HISTORY.md` | Narrative / decision log | Append: what shipped, agents spawned + headline findings, tools/skills used, key decisions + **why**, gotchas hit. |
 | `backend/.env.example` | Config documentation | A config/env var was added (one-line comment + default) or removed (delete every reference). |
+
+**Not part of this routine.** `docs/PLAN.md` and `docs/SESSION-HISTORY.md` were
+one-time artifacts — a build-out plan and a session record. Don't touch them on a
+normal doc sync. Only update `docs/PLAN.md`'s progress if the user is actively
+executing that plan and explicitly asks; treat a session/agent-history writeup as a
+separate, explicitly-requested deliverable, not a recurring step.
 
 ### issues.md entry format
 
@@ -91,7 +95,7 @@ code but stale in three docs is the classic drift.
 - [ ] New source files / docs are in `llms.txt`.
 - [ ] backlog.md "Done" matches what shipped; open items are still genuinely open.
 - [ ] issues.md has an entry per bug fixed (with commit + regression-test note).
-- [ ] Dates bumped: STATUS "Last updated," new issues.md entries, PLAN progress.
+- [ ] Dates bumped: STATUS "Last updated," new issues.md entries.
 - [ ] Re-read each edited paragraph once for AI-tell and idiom.
 
 ## Step 5 — commit
