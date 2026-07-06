@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import { Sparkline } from "@/components/Sparkline";
 import { api } from "@/lib/api";
 import type { Drop, DropStatus, Trend } from "@/lib/types";
 
@@ -33,6 +34,7 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   const [error, setError] = useState<string | null>(null);
   const [drop, setDrop] = useState<Drop | null>(latestDrop);
   const [pending, startTransition] = useTransition();
+  const [retrying, startRetry] = useTransition();
 
   // Adopt a newer drop coming from the server (e.g. after router.refresh()).
   useEffect(() => {
@@ -80,16 +82,48 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
     });
   }
 
+  function retry() {
+    if (!drop) return;
+    setError(null);
+    startRetry(async () => {
+      try {
+        // Backend resumes from the last committed step — an already-posted tweet
+        // is never sent twice. The poll effect then tracks it to completion.
+        const requeued = await api.retryDrop(drop.id);
+        setDrop(requeued);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Retry failed.");
+      }
+    });
+  }
+
   return (
     <li className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">{trend.term}</h2>
-        <span
-          className="font-mono text-sm text-neutral-400"
-          aria-label={`Hype score ${trend.hype_score}`}
-        >
-          hype {Math.round(trend.hype_score).toLocaleString()}
+        <span className="flex items-center gap-2">
+          <Sparkline points={trend.spark} />
+          <span
+            className="font-mono text-sm text-neutral-400"
+            aria-label={`Hype score ${trend.hype_score}`}
+          >
+            hype {Math.round(trend.hype_score).toLocaleString()}
+          </span>
         </span>
+      </div>
+
+      <div
+        className="mt-2 h-1 w-full overflow-hidden rounded-full bg-neutral-800"
+        role="meter"
+        aria-valuemin={0}
+        aria-valuemax={1}
+        aria-valuenow={Number(trend.normalized_hype.toFixed(2))}
+        aria-label="Hype relative to this source"
+      >
+        <div
+          className="h-full rounded-full bg-neutral-500"
+          style={{ width: `${Math.round(trend.normalized_hype * 100)}%` }}
+        />
       </div>
 
       <p className="mt-1 text-xs text-neutral-500">
@@ -153,6 +187,17 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         <p className="mt-2 break-words text-xs text-red-400">
           Last drop error: {drop.error}
         </p>
+      ) : null}
+
+      {drop?.status === "failed" ? (
+        <button
+          type="button"
+          onClick={retry}
+          disabled={retrying}
+          className="mt-2 min-h-[44px] rounded-lg border border-red-500/40 px-4 text-sm font-medium text-red-300 transition hover:border-red-400 hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-red-500/50 disabled:opacity-50"
+        >
+          {retrying ? "Retrying…" : "Retry drop"}
+        </button>
       ) : null}
 
       {drop?.status === "published" ? (

@@ -39,7 +39,9 @@ class FactoryPipeline:
 
         try:
             # 1. Build + host the SVG print file. Printful fetches it by URL.
-            svg = PrintfulClient.build_text_svg(drop.design_copy)
+            svg = PrintfulClient.build_text_svg(
+                drop.design_copy, garment_color=self._settings.printful_garment_color
+            )
             artifact = self._write_artifact(drop.id, svg)
 
             # Dry-run: complete the loop without any external service. Mark every
@@ -68,36 +70,45 @@ class FactoryPipeline:
             printful = PrintfulClient(self._settings)
             x = XClient(self._settings)
 
+            # Each external step commits its result as it lands and is skipped if
+            # already present, so retrying a failed drop RESUMES rather than
+            # repeats — critically, it never posts a second tweet (see step 4).
+
             # 2. Printful mockup.
-            mockup_url = printful.generate_mockup(print_file_url)
-            drop.printful_mockup_url = mockup_url
-            session.commit()
+            if not drop.printful_mockup_url:
+                drop.printful_mockup_url = printful.generate_mockup(print_file_url)
+                session.commit()
+            mockup_url = drop.printful_mockup_url
 
             # 3. Printful catalog sync.
-            drop.printful_sync_product_id = printful.sync_product(
-                name=f"ShirtPost — {trend.term}",
-                print_file_url=print_file_url,
-                thumbnail_url=mockup_url,
-            )
-            session.commit()
+            if not drop.printful_sync_product_id:
+                drop.printful_sync_product_id = printful.sync_product(
+                    name=f"ShirtPost — {trend.term}",
+                    print_file_url=print_file_url,
+                    thumbnail_url=mockup_url,
+                )
+                session.commit()
 
-            # 4. X.com: upload mockup (v1.1) then tweet (v2) with the media_id.
-            store_base = self._settings.store_base_url
-            product_url = (
-                f"{store_base.rstrip('/')}/{drop.printful_sync_product_id}"
-                if store_base
-                else None
-            )
-            media_id = x.upload_media(self._download(mockup_url))
-            tweet_id = x.post_tweet(
-                self._broadcast_copy(trend.term, product_url), media_id=media_id
-            )
+            # 4. X.com: upload mockup then tweet (v2) with the media_id. Gated on
+            # x_tweet_id and committed on its own BEFORE the published transition,
+            # so a failure after posting can't make a retry double-post.
+            if not drop.x_tweet_id:
+                store_base = self._settings.store_base_url
+                product_url = (
+                    f"{store_base.rstrip('/')}/{drop.printful_sync_product_id}"
+                    if store_base
+                    else None
+                )
+                media_id = x.upload_media(self._download(mockup_url))
+                drop.x_tweet_id = x.post_tweet(
+                    self._broadcast_copy(trend.term, product_url), media_id=media_id
+                )
+                session.commit()
 
-            drop.x_tweet_id = tweet_id
             drop.status = DropStatus.PUBLISHED
             drop.published_at = utcnow()
             session.commit()
-            logger.info("drop %s published tweet=%s", drop.id, tweet_id)
+            logger.info("drop %s published tweet=%s", drop.id, drop.x_tweet_id)
             return drop
         except Exception as exc:
             session.rollback()

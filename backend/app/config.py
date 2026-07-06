@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # Baseline blank: a standard unisex t-shirt. Override per the Printful catalog.
     printful_default_product_id: int = 71
     printful_default_variant_id: int = 4012
+    # Garment color the print sits on. Drives the print *text* color for contrast:
+    # a light garment gets dark ink, a dark garment gets white. Default variant
+    # 4012 is black, so the print defaults to white. Change this whenever you
+    # change the variant, or the art can vanish into the shirt (white-on-white).
+    # Accepts a common color name ("black", "navy", "sport grey") or a #RRGGBB hex.
+    printful_garment_color: str = "black"
     # Printful's mockup generator fetches the print file by public URL, so the
     # generated SVG must be hosted somewhere Printful can reach. Base URL of that
     # host; the pipeline appends "/<drop_id>.svg". Unset => Factory fails loud.

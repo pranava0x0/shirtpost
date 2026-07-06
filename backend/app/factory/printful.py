@@ -9,6 +9,7 @@ before it lands in the SVG to neutralize markup/script injection.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from xml.sax.saxutils import escape as xml_escape
 
@@ -20,9 +21,66 @@ logger = logging.getLogger(__name__)
 
 PRINTFUL_API_BASE = "https://api.printful.com"
 
+# Common Printful garment colors -> approx #RRGGBB. Not exhaustive; an unknown
+# name falls back to the dark-garment assumption (white ink) and logs a warning.
+_GARMENT_HEX: dict[str, str] = {
+    "black": "#000000",
+    "white": "#FFFFFF",
+    "navy": "#1F2A44",
+    "red": "#B02020",
+    "maroon": "#5C1A1B",
+    "royal": "#1D4ED8",
+    "royal blue": "#1D4ED8",
+    "forest": "#14532D",
+    "forest green": "#14532D",
+    "charcoal": "#36454F",
+    "dark heather": "#3F4448",
+    "asphalt": "#3B3B3B",
+    "sport grey": "#B4B4B4",
+    "athletic heather": "#CFD2D4",
+    "ash": "#E7E7E4",
+    "heather grey": "#B4B4B4",
+    "light blue": "#ADD8E6",
+    "yellow": "#F5D547",
+    "daisy": "#F5D547",
+    "pink": "#F4A6C0",
+}
+
 
 class PrintfulError(RuntimeError):
     pass
+
+
+def _relative_luminance(hex_color: str) -> float:
+    """WCAG relative luminance (0=black, 1=white) of a #RRGGBB string."""
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+    def _lin(c: float) -> float:
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+
+def print_color_for_garment(garment_color: str) -> str:
+    """Pick a print (ink) color that contrasts with the garment.
+
+    Light garment -> near-black ink; dark garment -> white ink. Accepts a known
+    color name or a ``#RRGGBB`` hex. An unrecognized value falls back to white
+    ink (the safe default for the black default variant) and logs a warning so a
+    bad color surfaces instead of silently printing invisible white-on-white.
+    """
+    raw = (garment_color or "").strip().lower()
+    hex_color = _GARMENT_HEX.get(raw)
+    if hex_color is None and re.fullmatch(r"#?[0-9a-f]{6}", raw):
+        hex_color = f"#{raw.lstrip('#')}"
+    if hex_color is None:
+        logger.warning(
+            "unknown garment color %r; defaulting print to white ink", garment_color
+        )
+        return "#FFFFFF"
+    # Threshold ~0.4: garments lighter than mid-grey get dark ink.
+    return "#111111" if _relative_luminance(hex_color) > 0.4 else "#FFFFFF"
 
 
 def _wrap_words(words: list[str], max_chars: int) -> list[str]:
@@ -69,7 +127,7 @@ class PrintfulClient:
         height: int = 2400,
         *,
         margin: int = 150,
-        fill: str = "#FFFFFF",  # white art assumes a DARK garment (default variant is black)
+        garment_color: str = "black",  # default variant 4012 is black -> white ink
     ) -> str:
         """Render design copy centered *inside* the printable area.
 
@@ -78,7 +136,11 @@ class PrintfulClient:
         instead of spilling above/below it. Wrapping is done on the raw text and
         each line is XML-escaped afterward, so an escaped entity (``&lt;`` …) can
         never be split into invalid markup, and no raw markup can break out.
+
+        The ink color is derived from ``garment_color`` for contrast, so the art
+        never prints white-on-white when the variant is a light garment.
         """
+        fill = print_color_for_garment(garment_color)
         words = design_copy.split() or [design_copy]
         avail_w = width - 2 * margin
         avail_h = height - 2 * margin

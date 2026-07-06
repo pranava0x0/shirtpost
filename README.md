@@ -27,10 +27,17 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 - `GET /health` — liveness
-- `GET /api/trends?limit=100` — trends sorted by Hype Score
+- `GET /api/trends?limit=100&source=<id>` — trends by Hype Score. Each carries a
+  within-source `normalized_hype` (0..1) and a `spark` series (recent hype, for the inline
+  sparkline). Optional `source` filter.
+- `GET /api/trends/{id}/observations` — append-only observation history for one trend
+  (newest first; `limit` caps the response, not what is stored)
 - `POST /api/trends/{id}/submit` — `{ "design_copy": "..." }`, fires the Factory (409 if a drop for that trend is already in flight)
 - `GET /api/drops` — drops, newest first
 - `GET /api/drops/{id}` — one drop (the dashboard polls this while a drop is in flight)
+- `POST /api/drops/{id}/retry` — re-run a **failed** drop. The pipeline resumes from the last
+  committed step, so an already-posted tweet is never sent twice (409 if the drop isn't
+  failed, or another drop for its trend is in flight)
 - `POST /api/radar/sweep` — force an immediate radar sweep (the "Refresh radar" button)
 
 Run tests:
@@ -59,9 +66,16 @@ production and dev output corrupts the chunk manifest. Use one or the other.
 ## What works end-to-end today
 
 - Radar → DB → Admin queue → submit → Factory pipeline runs and records status.
+- Every sweep appends a `trend_observations` row, so the Studio draws a real hype
+  **sparkline** per trend (not just the latest delta). Trends are grouped into
+  **per-source lanes** — volumes aren't comparable across sources, so a within-source
+  `normalized_hype` scales each lane instead of one misleading global ranking.
 - The Factory **fails loud** (drop `status=failed`, `error` surfaced in the UI) until
   Printful + X.com credentials *and* `PRINTFUL_PRINT_FILE_BASE_URL` (SVG hosting) are
-  configured. See [backlog.md](backlog.md).
+  configured. A failed drop can be **retried** from the UI; the pipeline resumes from the
+  last committed step and never re-posts a tweet it already sent. See [backlog.md](backlog.md).
+- Print ink color is derived from `PRINTFUL_GARMENT_COLOR` for contrast, so art never
+  prints white-on-white on a light garment.
 - Set `FACTORY_DRY_RUN=true` to complete the loop **without** any external service:
   drops reach `published` with clearly-marked simulated outputs (mockup = the served SVG,
   `tweet dryrun-<id>`). Default off so a real misconfiguration still fails loud.

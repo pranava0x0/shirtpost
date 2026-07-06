@@ -64,6 +64,38 @@ class Trend(Base):
     drops: Mapped[list["Drop"]] = relationship(
         back_populates="trend", cascade="all, delete-orphan"
     )
+    observations: Mapped[list["TrendObservation"]] = relationship(
+        back_populates="trend",
+        cascade="all, delete-orphan",
+        order_by="TrendObservation.observed_at",
+    )
+
+
+class TrendObservation(Base):
+    """Append-only snapshot of a trend at one sweep. The Trend row keeps only the
+    latest + previous volume; this table keeps every observation, so a true
+    velocity curve can be reconstructed instead of a single latest delta.
+    Never updated in place — one row per (trend, sweep).
+    """
+
+    __tablename__ = "trend_observations"
+    __table_args__ = (
+        Index("ix_trend_observation_trend_time", "trend_id", "observed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trend_id: Mapped[int] = mapped_column(
+        ForeignKey("trends.id", ondelete="CASCADE"), index=True
+    )
+    trend: Mapped[Trend] = relationship(back_populates="observations")
+
+    volume: Mapped[int] = mapped_column(Integer)
+    velocity: Mapped[float] = mapped_column(Float)
+    hype_score: Mapped[float] = mapped_column(Float)
+    # Carried per row so a curve is self-describing even if a source later changes
+    # what `volume` measures (search_traffic / presence / seed).
+    measurement: Mapped[str] = mapped_column(String(32))
+    observed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class Drop(Base):

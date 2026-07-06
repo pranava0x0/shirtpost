@@ -7,7 +7,9 @@ outputting files" and not shipping art that renders off the printable area.
 import re
 import xml.etree.ElementTree as ET
 
-from app.factory.printful import PrintfulClient
+import pytest
+
+from app.factory.printful import PrintfulClient, print_color_for_garment
 
 CANVAS_H = 2400
 
@@ -52,3 +54,42 @@ def test_svg_escapes_ampersand_and_quotes():
 
 def test_svg_is_well_formed_xml():
     ET.fromstring(PrintfulClient.build_text_svg("we are so back & <b>delulu</b>"))
+
+
+# --- Garment-color safety: ink must contrast with the shirt ------------------
+
+
+@pytest.mark.parametrize(
+    "garment,expected",
+    [
+        ("black", "#FFFFFF"),  # dark garment -> white ink
+        ("navy", "#FFFFFF"),
+        ("forest green", "#FFFFFF"),
+        ("white", "#111111"),  # light garment -> dark ink
+        ("sport grey", "#111111"),
+        ("yellow", "#111111"),
+        ("#FFFFFF", "#111111"),  # hex passthrough
+        ("#000000", "#FFFFFF"),
+    ],
+)
+def test_print_color_contrasts_with_garment(garment, expected):
+    assert print_color_for_garment(garment) == expected
+
+
+def test_unknown_garment_color_falls_back_to_white_ink():
+    # Safe default for the black default variant; logged, never a crash.
+    assert print_color_for_garment("chartreuse-ish") == "#FFFFFF"
+    assert print_color_for_garment("") == "#FFFFFF"
+
+
+def test_light_garment_svg_is_not_white_on_white():
+    # Regression: build_text_svg used to hardcode white ink, so a light garment
+    # printed invisible art. Now the ink is derived from the garment color.
+    svg = PrintfulClient.build_text_svg("we are so back", garment_color="white")
+    assert 'fill="#111111"' in svg
+    assert 'fill="#FFFFFF"' not in svg
+
+
+def test_dark_garment_svg_keeps_white_ink():
+    svg = PrintfulClient.build_text_svg("we are so back", garment_color="black")
+    assert 'fill="#FFFFFF"' in svg

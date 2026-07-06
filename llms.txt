@@ -18,24 +18,26 @@
 
 ## Data Layer
 
-- [models.py](backend/app/models.py): SQLAlchemy ORM models for trends and drops, the single source of truth.
+- [models.py](backend/app/models.py): SQLAlchemy ORM models — trends, drops, and the append-only `trend_observations` history; the single source of truth.
 - [schemas.py](backend/app/schemas.py): Pydantic request/response schemas validated before any DB write.
 - [database.py](backend/app/database.py): Engine and session wiring; FastAPI solely owns the database.
 
 ## Integration Services (The Factory)
 
-- [printful.py](backend/app/factory/printful.py): Printful client for SVG text mockups and store catalog sync, with XML-escaped payloads.
-- [xcom.py](backend/app/factory/xcom.py): X.com client — v1.1 media upload then a v2 tweet carrying the media_id.
-- [pipeline.py](backend/app/factory/pipeline.py): Synchronous Factory pipeline invoked on admin submission, recording status and errors on each drop.
+- [printful.py](backend/app/factory/printful.py): Printful client for SVG text mockups and store catalog sync, with XML-escaped payloads and garment-contrast ink selection.
+- [xcom.py](backend/app/factory/xcom.py): X.com client — v2 media upload then a v2 tweet carrying the media_id.
+- [pipeline.py](backend/app/factory/pipeline.py): Idempotent Factory pipeline invoked on admin submission — each external step commits as it lands and is skipped on retry, so a posted tweet is never sent twice.
 
 ## Admin API
 
-- [routes.py](backend/app/api/routes.py): Endpoints to list trends by Hype Score, submit design copy, and list drops.
+- [routes.py](backend/app/api/routes.py): Endpoints to list trends (with per-source normalized hype + sparkline series), read a trend's observation history, submit design copy, list drops, and retry a failed drop.
 - [main.py](backend/app/main.py): FastAPI entrypoint wiring middleware, the API, and the radar lifecycle.
 
 ## Studio (Admin Dashboard)
 
-- [page.tsx](frontend/app/page.tsx): Single-page admin UI listing trends by Hype Score with a submit form per trend.
-- [TrendCard.tsx](frontend/components/TrendCard.tsx): Client component for pasting design copy and firing the factory.
+- [page.tsx](frontend/app/page.tsx): Single-page admin UI grouping trends into per-source lanes, each ranked within its own source.
+- [TrendCard.tsx](frontend/components/TrendCard.tsx): Client component for pasting design copy, firing the factory, retrying a failed drop, and showing the hype sparkline + within-source meter.
+- [Sparkline.tsx](frontend/components/Sparkline.tsx): Dependency-free inline SVG sparkline of a trend's recent hype scores.
+- [sources.ts](frontend/lib/sources.ts): Human labels for radar source ids used by the per-source lanes.
 - [api.ts](frontend/lib/api.ts): Typed fetch client for the FastAPI backend (no third-party HTTP deps).
 - [env.ts](frontend/lib/env.ts): Zod-validated client environment configuration.

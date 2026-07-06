@@ -23,18 +23,28 @@ The alternatives, if ever needed:
   Factory cannot complete end-to-end.
 - **FastAPI + Starlette BadHost upgrade** (priority: high). Pin fastapi/starlette to the
   CVE-2026-48710-patched line once resolvable; confirm `starlette >= 1.0.1`. Interim mitigation
-  (TrustedHostMiddleware) is in place. See `security.md`.
-- **Trend observation history** (priority: medium). Current model stores only latest + prev
-  volume per trend. An append-only `trend_observations` table would give true velocity curves
-  and charts instead of a single delta.
+  (TrustedHostMiddleware) is in place. See `security.md`. **Blocked:** `starlette >= 1.0.1` is a
+  major jump incompatible with the pinned `fastapi==0.115.6` (needs `starlette < 0.42`); do it as
+  a coordinated fastapi+starlette upgrade with a fresh advisory sweep, not a lone bump.
 - **Lock files / hash-locked installs** (priority: medium). The frontend commits
   `package-lock.json` (CI uses `npm ci`); add `uv lock` / `pip-compile --generate-hashes` for the
   backend and install with `--require-hashes`.
-- **Pipeline retries + idempotency** (priority: medium). A failed drop should be safely
-  re-runnable without double-posting to X.com (dedup by drop id / store the tweet attempt). The
-  409 in-flight guard prevents concurrent double-fires but not retry-after-failure dedup.
 
 ## Done (was here, now implemented)
+
+- ~~Trend observation history~~ — append-only `trend_observations` table; the worker writes one
+  snapshot per sweep (`worker.py`), `GET /api/trends/{id}/observations` serves the history, and each
+  `/trends` row carries a `spark` series the Studio draws as an inline sparkline.
+- ~~Pipeline retries + idempotency~~ — each external step commits as it lands and is skipped when its
+  result is already present, so a retry RESUMES; the tweet id is committed before the published
+  transition so a crash-after-post can't double-tweet. `POST /api/drops/{id}/retry` + a UI button
+  reserve the in-flight slot (unique index) and re-run. Unit tests cover no-double-post + resume.
+- ~~True cross-source normalization~~ — trends group into per-source lanes in the Studio, each ranked
+  within its own source; `normalized_hype` (0..1, min-max over a source's population) is the honest
+  within-lane scale. Volumes are never ranked on one global scale across incomparable measurements.
+- ~~Garment-color safety~~ — `print_color_for_garment` derives ink from `PRINTFUL_GARMENT_COLOR`
+  (light garment → dark ink, dark → white), so art never prints white-on-white. Unknown color logs
+  a warning and defaults to white (safe for the black default variant).
 
 - ~~Real source-adapter hardening~~ — `radar/fetch.py` adds disk caching, per-host rate limiting
   (>=1.5s), and 429 backoff.
@@ -58,14 +68,12 @@ The alternatives, if ever needed:
 
 ## Open follow-ups from the PR review
 
-- **True cross-source normalization** (priority: medium). The `measurement` field stops the UI from
-  *implying* comparability, but the global queue still ranks all sources by one `hype_score`. Add
-  per-source normalization or separate ranking lanes before mixing real sources.
 - **Storefront URL + conversion path** (priority: high before any real X posting). Phase 1 has no
-  checkout, so the broadcast is a teaser. Wire a real product/store URL + CTA and don't announce a
-  buyable drop until one exists.
-- **Garment-color safety** (priority: low). `build_text_svg` fill defaults to white, which assumes a
-  dark garment (the default variant is black). Tie the print color to the selected variant's color.
+  checkout, so the broadcast is a teaser. The code path exists (`STORE_BASE_URL` → shop link in the
+  broadcast); it stays a teaser until a real product/store URL + CTA is wired and a drop is buyable.
+- **Per-source rank normalization at scale** (priority: low). The lanes + `normalized_hype` land the
+  honest within-source ranking. If sources later need cross-source triage (one merged action queue),
+  add an explicit exposure-weighted score — never a bare `hype_score` compare across measurements.
 
 ## Phase 2+
 

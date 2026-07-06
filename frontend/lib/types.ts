@@ -9,8 +9,23 @@ export type Trend = {
   volume: number;
   velocity: number;
   hype_score: number;
+  // Hype relative to its own source (0..1). Volumes are not comparable across
+  // sources, so this is a within-lane scale only — never a cross-source rank.
+  normalized_hype: number;
+  // Recent hype trajectory, oldest -> newest, for the inline sparkline.
+  spark: number[];
   first_seen_at: string;
   last_seen_at: string;
+};
+
+export type TrendObservation = {
+  id: number;
+  trend_id: number;
+  volume: number;
+  velocity: number;
+  hype_score: number;
+  measurement: string;
+  observed_at: string;
 };
 
 export type DropStatus = "pending" | "processing" | "published" | "failed";

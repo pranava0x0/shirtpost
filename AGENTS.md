@@ -119,6 +119,10 @@ Default verification matrix (project-specific `AGENTS.md` should override with c
 
 **Run a build/codegen script twice to assert idempotency** — the second run must inject identical bytes.
 
+**To verify a fail-loud external pipeline, boot it twice.** A pipeline that fails loud without credentials has two truths to see: run it in **real mode** (no creds) to watch it fail with the exact reason and expose the error/retry UI, then flip the project's **dry-run** flag and re-run to watch the happy path complete without external calls. One boot only ever shows half the behavior. A resumable retry is proven by re-running the *same* record and asserting no duplicate is created (count unchanged) and no external call re-fires.
+
+**Seed the time-series before verifying a visualization that reads it.** A sparkline/chart backed by an append-only history table renders empty until ≥2 observations exist — trigger the ingest (e.g. hit the sweep endpoint N times) *before* screenshotting, or you can't tell "feature broken" from "no data yet." Read the API payload (`curl … | python -m json.tool`) to confirm the series is populated, then check the UI.
+
 **Spot-check source URLs by status** before committing externally-sourced records: `curl -s -o /dev/null -w "%{http_code}" -L -A "Mozilla/5.0..." <url>`. A 403 (bot-blocker) is inconclusive — keep it; a 404 is dead — drop or replace.
 
 ---
