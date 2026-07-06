@@ -1,10 +1,10 @@
 """The Factory pipeline: invoked on admin submission.
 
-Sequence: build + persist the SVG print file -> Printful mockup -> Printful catalog
-sync -> download mockup -> X.com media upload -> X.com tweet. Each external step
-commits its result as it lands, so a later failure leaves a partial, debuggable
-trail rather than losing everything. Failures are recorded on the Drop (status +
-error) and re-raised — never swallowed.
+Sequence: build the SVG source + rasterize a print-ready PNG (Printful rejects
+SVG) -> Printful mockup -> Printful catalog sync -> download mockup -> X.com media
+upload -> X.com tweet. Each external step commits its result as it lands, so a
+later failure leaves a partial, debuggable trail rather than losing everything.
+Failures are recorded on the Drop (status + error) and re-raised — never swallowed.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
 from app.factory.printful import PrintfulClient
+from app.factory.render import render_text_png
 from app.factory.xcom import XClient
 from app.models import Drop, DropStatus, Trend, utcnow
 
@@ -38,17 +39,20 @@ class FactoryPipeline:
         session.commit()
 
         try:
-            # 1. Build + host the SVG print file. Printful fetches it by URL.
-            svg = PrintfulClient.build_text_svg(
-                drop.design_copy, garment_color=self._settings.printful_garment_color
+            # 1. Build the SVG source (debuggable) and rasterize the PNG Printful
+            # will actually fetch — Printful's DTG pipeline rejects SVG.
+            garment = self._settings.printful_garment_color
+            svg = PrintfulClient.build_text_svg(drop.design_copy, garment_color=garment)
+            self._write_artifact(drop.id, "svg", svg.encode("utf-8"))
+            png_path = self._write_artifact(
+                drop.id, "png", render_text_png(drop.design_copy, garment_color=garment)
             )
-            artifact = self._write_artifact(drop.id, svg)
 
             # Dry-run: complete the loop without any external service. Mark every
             # output as simulated so it can never be mistaken for a real publish.
             if self._settings.factory_dry_run:
                 base = self._settings.public_base_url.rstrip("/")
-                drop.printful_mockup_url = f"{base}/artifacts/{drop.id}.svg"
+                drop.printful_mockup_url = f"{base}/artifacts/{drop.id}.png"
                 drop.printful_sync_product_id = f"dryrun-{drop.id}"
                 drop.x_tweet_id = f"dryrun-{drop.id}"
                 drop.dry_run = True
@@ -62,10 +66,10 @@ class FactoryPipeline:
             if not base:
                 raise FactoryError(
                     "PRINTFUL_PRINT_FILE_BASE_URL is not set. Printful must fetch the "
-                    f"print file by public URL. SVG saved to {artifact}; host it and "
+                    f"print file by public URL. PNG saved to {png_path}; host it and "
                     "set the base URL to continue."
                 )
-            print_file_url = f"{base.rstrip('/')}/{drop.id}.svg"
+            print_file_url = f"{base.rstrip('/')}/{drop.id}.png"
 
             printful = PrintfulClient(self._settings)
             x = XClient(self._settings)
@@ -119,11 +123,11 @@ class FactoryPipeline:
             raise
 
     # --- helpers ------------------------------------------------------------
-    def _write_artifact(self, drop_id: int, svg: str) -> Path:
+    def _write_artifact(self, drop_id: int, ext: str, data: bytes) -> Path:
         out_dir = Path(self._settings.artifacts_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / f"{drop_id}.svg"
-        path.write_text(svg, encoding="utf-8")
+        path = out_dir / f"{drop_id}.{ext}"
+        path.write_bytes(data)
         return path
 
     def _download(self, url: str) -> bytes:

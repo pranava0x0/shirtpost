@@ -15,3 +15,6 @@ requests==2.32.3
 requests-oauthlib==2.0.0
 beautifulsoup4==4.12.3
 feedparser==6.0.11
+# Rasterizes the SVG print source to a transparent PNG for Printful (which rejects
+# SVG). Uses Pillow's bundled scalable font — no system cairo, no vendored binary.
+pillow==12.3.0

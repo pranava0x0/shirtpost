@@ -33,7 +33,8 @@ def test_dry_run_publishes_without_external_calls():
         assert drop.dry_run is True
         assert drop.x_tweet_id.startswith("dryrun-")
         assert drop.printful_sync_product_id.startswith("dryrun-")
-        assert drop.printful_mockup_url.endswith(f"/artifacts/{drop.id}.svg")
+        # Printful rejects SVG -> the served/mockup artifact is the rasterized PNG.
+        assert drop.printful_mockup_url.endswith(f"/artifacts/{drop.id}.png")
         assert drop.error is None
 
 
