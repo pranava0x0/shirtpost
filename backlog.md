@@ -97,8 +97,9 @@ The alternatives, if ever needed:
 - **LLM family-safe classifier** (priority: medium, PLAN.md 3 #5). The keyword blocklist over-blocks
   ("grape harvest") and can't judge context ("Suicide Squad (film)"). A Haiku pass cached by content
   hash, gated behind the keyword filter, is the real fix — deferred (needs an API key + cost budget).
-  The `anthropic` client now exists (`app/copy/generate.py`), so the classifier can reuse it and the
-  same `QUIP_MODEL`/key wiring.
+  Note the constraint: the Anthropic key must stay off FastAPI (see below), so this classifier can't
+  hold the key on the backend. It would either run in a Next.js server route (like the quip
+  generator) with FastAPI calling it, or move the whole trend-ingest safety gate server-side there.
 
 ## Copy generation (shipped 2026-07-06)
 
@@ -110,6 +111,16 @@ The alternatives, if ever needed:
   proposes, human disposes). Fails loud (503) with no key.
 - Follow-ups (priority: low): cache quips by trend term to avoid re-billing repeat clicks; a
   regenerate/"more like this" control; let the operator tune the count from the UI.
+- **Rate-limit / gate `/api/quips`** (priority: medium). The route spends real Anthropic tokens per
+  call and has no auth or rate limit — anyone who can reach the dashboard can burn budget. Add a
+  simple per-IP/session limit (or fold it into the eventual dashboard auth). Pairs with the
+  cache-by-trend-term item above.
+- **Frontend test runner for `lib/quips.ts`** (priority: medium). The parse/family-filter/dedup/cap
+  logic is pure and safety-relevant but untested — the frontend has no test harness (its Python
+  predecessor did have tests, removed with the move). Add vitest (advisory-sweep it) + `quips.test.ts`
+  covering: fenced/malformed JSON, non-`{quips}` shape, `Pornhub` over-block, quote-stripping, dedup,
+  length cap, count cap. Deliberately deferred out of the merge to avoid bolting on a framework at the
+  last minute.
 - **Family blocklist is duplicated** (priority: low) across `backend/app/config.py` and
   `frontend/lib/quips.ts` (the output filter) — kept in sync by hand. A drift only over-blocks, but
   if it grows, expose one source (e.g. a backend `/config/family-blocklist` the route reads once).

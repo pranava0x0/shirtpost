@@ -93,7 +93,8 @@ def fetch_rss(source_id: str, url: str) -> list[RawTrend]:
 
 # Family-friendly, lighthearted seeds so the queue is never empty in dev. These
 # double as the funny-phrase source *and* the house-voice anchors the quip
-# generator riffs on (copy/generate.py `_STYLE_ANCHORS` mirrors the best of them).
+# generator riffs on (the best of them are mirrored in the Next.js dashboard at
+# `frontend/lib/quips.ts` `STYLE_ANCHORS` — the generator lives there, not here).
 # Kept a couple of originals ("we are so back", "delulu is the solulu") and
 # freshened the rest toward current, wearable, meme-literate bangers.
 _SIMULATED: list[tuple[str, int]] = [

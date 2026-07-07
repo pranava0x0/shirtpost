@@ -16,14 +16,19 @@ Anthropic key lives only with the dashboard server (owner constraint), which add
   would ship it to the browser) inside the route only; not in the client zod env.
 - No other index matches; the Starlette BadHost note below still stands.
 
-## Sweep 2026-07-06 — LLM quip generator dependency (superseded — key moved off backend)
+## Sweep 2026-07-06 — LLM quip generator dependency (SUPERSEDED — never shipped)
+
+> **Not in the shipped tree.** This first pass added the Python `anthropic` dep to
+> the backend; it was reverted within the same branch (commit 2) in favor of the
+> Next.js `@anthropic-ai/sdk` route above, to keep the key off FastAPI. Kept for an
+> honest audit trail: the sweep below was real (the Python package IS clean), but
+> `backend/requirements.txt` ships with **no** `anthropic` dep. Don't re-add it.
 
 Triggered by: adding the official `anthropic` SDK to `backend/requirements.txt` to
 generate funny one-liner shirt copy from trends. Advisory index fetched 2026-07-06.
 
-- **`anthropic==0.116.0`** — NOT named in the index. Cleared for use. Pinned exact.
-  Pulls `httpx` (already cleared below) + small typed-client deps; hash-locked via
-  `uv pip compile --universal --generate-hashes`.
+- **`anthropic==0.116.0`** — NOT named in the index. Cleared for use (but reverted,
+  see above). Pulls `httpx` (already cleared below) + small typed-client deps.
 - `httpx`, `pydantic` re-checked against the index — still not named. No new matches.
 - Key stays env-only (`ANTHROPIC_API_KEY`), never logged; the generator makes no
   network call at import time and fails loud (503) when the key is absent.
