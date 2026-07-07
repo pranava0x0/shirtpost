@@ -35,6 +35,9 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   const [drop, setDrop] = useState<Drop | null>(latestDrop);
   const [pending, startTransition] = useTransition();
   const [retrying, startRetry] = useTransition();
+  const [quips, setQuips] = useState<string[]>([]);
+  const [quipError, setQuipError] = useState<string | null>(null);
+  const [generating, startGenerating] = useTransition();
 
   // Adopt a newer drop coming from the server (e.g. after router.refresh()).
   useEffect(() => {
@@ -78,6 +81,21 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         setDrop(created);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Submission failed.");
+      }
+    });
+  }
+
+  function generate() {
+    setQuipError(null);
+    startGenerating(async () => {
+      try {
+        const { quips: ideas } = await api.generateQuips(trend.id);
+        setQuips(ideas);
+        if (ideas.length === 0) {
+          setQuipError("No family-safe ideas came back — try again.");
+        }
+      } catch (e) {
+        setQuipError(e instanceof Error ? e.message : "Could not generate ideas.");
       }
     });
   }
@@ -154,6 +172,44 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         </p>
       ) : null}
 
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={generate}
+          disabled={generating}
+          className="inline-flex min-h-[44px] items-center rounded-lg border border-neutral-700 px-3 text-sm font-medium text-neutral-200 transition hover:border-neutral-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-neutral-500 disabled:opacity-50"
+        >
+          {generating ? "Cooking up bangers…" : "✨ Generate ideas"}
+        </button>
+        <span className="text-xs text-neutral-500">
+          funny one-liners riffed on this trend
+        </span>
+      </div>
+
+      {quipError ? (
+        <p className="mt-2 text-sm text-amber-400">{quipError}</p>
+      ) : null}
+
+      {quips.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-2" aria-label="Suggested slogans">
+          {quips.map((idea) => (
+            <li key={idea}>
+              <button
+                type="button"
+                onClick={() => setCopy(idea)}
+                className={`min-h-[44px] rounded-full border px-3 text-sm transition focus:outline-none focus:ring-2 focus:ring-neutral-500 ${
+                  copy === idea
+                    ? "border-neutral-300 bg-neutral-100 text-neutral-900"
+                    : "border-neutral-700 text-neutral-200 hover:border-neutral-400 hover:text-white"
+                }`}
+              >
+                {idea}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       <div className="mt-3">
         <label htmlFor={`copy-${trend.id}`} className="sr-only">
           Design copy for {trend.term}
@@ -164,7 +220,7 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
           onChange={(e) => setCopy(e.target.value)}
           rows={2}
           maxLength={500}
-          placeholder="Paste design copy from your LLM…"
+          placeholder="Pick an idea above, or paste your own copy…"
           className="w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-500"
         />
       </div>

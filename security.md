@@ -3,6 +3,18 @@
 Source: https://pranava0x0.github.io/vibe-coding-security/llms-ctx.txt
 Refresh if > 7 days old, or before any new dependency add / scaffold / CDN asset / GitHub Action / fetched install script.
 
+## Sweep 2026-07-06 — LLM quip generator dependency
+
+Triggered by: adding the official `anthropic` SDK to `backend/requirements.txt` to
+generate funny one-liner shirt copy from trends. Advisory index fetched 2026-07-06.
+
+- **`anthropic==0.116.0`** — NOT named in the index. Cleared for use. Pinned exact.
+  Pulls `httpx` (already cleared below) + small typed-client deps; hash-locked via
+  `uv pip compile --universal --generate-hashes`.
+- `httpx`, `pydantic` re-checked against the index — still not named. No new matches.
+- Key stays env-only (`ANTHROPIC_API_KEY`), never logged; the generator makes no
+  network call at import time and fails loud (503) when the key is absent.
+
 ## Sweep 2026-07-05 — Phase 2A raster dependency
 
 Triggered by: adding `pillow` to `backend/requirements.txt` for SVG→PNG rasterization

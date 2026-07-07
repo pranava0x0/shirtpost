@@ -23,6 +23,11 @@ export const api = {
   getObservations: (trendId: number) =>
     http<TrendObservation[]>(`/trends/${trendId}/observations`),
   triggerSweep: () => http<{ touched: number }>("/radar/sweep", { method: "POST" }),
+  generateQuips: (trendId: number, count?: number) =>
+    http<{ quips: string[] }>(
+      `/trends/${trendId}/quips${count ? `?count=${count}` : ""}`,
+      { method: "POST" },
+    ),
   submitDesign: (trendId: number, designCopy: string) =>
     http<Drop>(`/trends/${trendId}/submit`, {
       method: "POST",

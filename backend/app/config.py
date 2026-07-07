@@ -121,6 +121,19 @@ class Settings(BaseSettings):
     x_access_token: str | None = None
     x_access_token_secret: str | None = None
 
+    # --- Copy generation (LLM quips) ----------------------------------------
+    # Optional: turns a trend into candidate funny one-liner shirt copy. Absent
+    # key => the /quips endpoint fails loud (503); the operator can still paste
+    # their own copy. Read from the env only; never logged.
+    anthropic_api_key: str | None = None
+    # Cheapest model that clears the humor bar (CLAUDE.md: Haiku before Opus). We
+    # generate a *batch* and let the operator pick, so a flat line or two is fine.
+    # Set to a Sonnet id (e.g. "claude-sonnet-5") for wittier, pricier output.
+    quip_model: str = "claude-haiku-4-5"
+    quip_count: int = Field(default=6, ge=1, le=12)
+    # Drop candidates longer than this — a shirt one-liner, not a paragraph.
+    quip_max_chars: int = Field(default=80, ge=10, le=200)
+
     # --- App ----------------------------------------------------------------
     user_agent: str = "ShirtPostRadar/0.1 (+https://github.com/pranava0x0/shirtpost)"
 

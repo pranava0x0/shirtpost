@@ -91,13 +91,20 @@ def fetch_rss(source_id: str, url: str) -> list[RawTrend]:
     return out
 
 
-# Family-friendly, lighthearted seeds so the queue is never empty in dev.
+# Family-friendly, lighthearted seeds so the queue is never empty in dev. These
+# double as the funny-phrase source *and* the house-voice anchors the quip
+# generator riffs on (copy/generate.py `_STYLE_ANCHORS` mirrors the best of them).
+# Kept a couple of originals ("we are so back", "delulu is the solulu") and
+# freshened the rest toward current, wearable, meme-literate bangers.
 _SIMULATED: list[tuple[str, int]] = [
-    ("we are so back", 92_000),
-    ("make no mistakes", 41_000),
-    ("very mindful very demure", 158_000),
-    ("delulu is the solulu", 73_000),
-    ("it's giving main character", 55_000),
+    ("we are so back", 92_000),  # original, still undefeated
+    ("delulu is the solulu", 73_000),  # original
+    ("it's giving unemployed", 61_000),
+    ("in my villain era", 79_000),
+    ("gaslight gatekeep girlboss", 84_000),
+    ("touch grass immediately", 58_000),
+    ("crashing out respectfully", 66_000),
+    ("nobody is ready for this conversation", 47_000),
 ]
 
 

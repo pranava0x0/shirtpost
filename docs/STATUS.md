@@ -13,7 +13,7 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
 ## Verified (all green, 2026-07-06)
 
-- Backend: `pytest` = **94 passed** on CPython 3.12 (was 30 at scaffold); the
+- Backend: `pytest` = **111 passed** on CPython 3.12 (was 30 at scaffold); the
   Wikipedia parser is also live-validated against the real API.
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
@@ -36,6 +36,23 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 - **Hype Score fix** — found by *running* it: the spec's `velocity × volume`
   zeroed every score on the second identical sweep. Rebased on a volume base
   with a capped velocity boost; verified live to hold across re-sweeps.
+
+## Merch humor: LLM quip generator (this branch)
+
+- **Funny one-liner copy from trends** — the design copy was operator-pasted
+  "from your LLM"; nothing funny was proposed. `app/copy/generate.py` +
+  `POST /api/trends/{id}/quips` now ask Claude for a batch of banger shirt
+  slogans riffed on the trend, run each through the Radar's family-safe gate,
+  dedup + length-cap, and return candidates. The Studio "Generate ideas" button
+  renders them as pickable chips → fills the copy box (model proposes, human
+  picks). Haiku by default (`QUIP_MODEL` → Sonnet for wittier); fails loud (503)
+  with no `ANTHROPIC_API_KEY`. Seeds in `radar/sources.py` freshened toward
+  current, wearable bangers (kept "we are so back" / "delulu is the solulu").
+  `anthropic==0.116.0` added (advisory-swept, hash-locked).
+  **Constraint:** the key must not live on the FastAPI backend long-term — the
+  target is to move quip generation server-side in Next.js so the key stays with
+  the dashboard server, not the public admin API. Interim impl reads it on
+  FastAPI; don't deploy the backend with the key. See `backlog.md`.
 
 ## Phase 1.5 improvements (this branch)
 
