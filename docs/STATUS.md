@@ -13,7 +13,7 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
 ## Verified (all green, 2026-07-06)
 
-- Backend: `pytest` = **111 passed** on CPython 3.12 (was 30 at scaffold); the
+- Backend: `pytest` = **98 passed** on CPython 3.12 (was 30 at scaffold); the
   Wikipedia parser is also live-validated against the real API.
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
@@ -40,19 +40,21 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 ## Merch humor: LLM quip generator (this branch)
 
 - **Funny one-liner copy from trends** — the design copy was operator-pasted
-  "from your LLM"; nothing funny was proposed. `app/copy/generate.py` +
-  `POST /api/trends/{id}/quips` now ask Claude for a batch of banger shirt
-  slogans riffed on the trend, run each through the Radar's family-safe gate,
-  dedup + length-cap, and return candidates. The Studio "Generate ideas" button
-  renders them as pickable chips → fills the copy box (model proposes, human
-  picks). Haiku by default (`QUIP_MODEL` → Sonnet for wittier); fails loud (503)
-  with no `ANTHROPIC_API_KEY`. Seeds in `radar/sources.py` freshened toward
-  current, wearable bangers (kept "we are so back" / "delulu is the solulu").
-  `anthropic==0.116.0` added (advisory-swept, hash-locked).
-  **Constraint:** the key must not live on the FastAPI backend long-term — the
-  target is to move quip generation server-side in Next.js so the key stays with
-  the dashboard server, not the public admin API. Interim impl reads it on
-  FastAPI; don't deploy the backend with the key. See `backlog.md`.
+  "from your LLM"; nothing funny was proposed. The Studio "Generate ideas" button
+  asks Claude for a batch of banger shirt slogans riffed on the trend, runs each
+  through the Radar's family-safe gate, dedup + length-caps, and renders them as
+  pickable chips → fills the copy box (model proposes, human picks). Seeds in
+  `radar/sources.py` freshened toward current, wearable bangers (kept "we are so
+  back" / "delulu is the solulu").
+- **The key lives on the dashboard, not the backend.** Generation runs in a
+  Next.js server route (`frontend/app/api/quips/route.ts`, `@anthropic-ai/sdk`);
+  the browser POSTs the trend fields it already has to that same-origin route.
+  `ANTHROPIC_API_KEY` is read there only (server env — **never** `NEXT_PUBLIC_*`),
+  so it never touches the public FastAPI admin API. Fails loud (503) with no key;
+  Haiku by default (`QUIP_MODEL` → Sonnet for wittier). The Python `anthropic`
+  dep and the old `/quips` FastAPI endpoint were removed. Pure filter/parse logic
+  lives in `frontend/lib/quips.ts`. Advisory-swept: `@anthropic-ai/sdk==0.110.0`
+  (+ a `zod` bump to `3.25.76` for its peer range), see `security.md`.
 
 ## Phase 1.5 improvements (this branch)
 

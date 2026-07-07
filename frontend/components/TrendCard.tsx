@@ -89,7 +89,7 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
     setQuipError(null);
     startGenerating(async () => {
       try {
-        const { quips: ideas } = await api.generateQuips(trend.id);
+        const { quips: ideas } = await api.generateQuips(trend);
         setQuips(ideas);
         if (ideas.length === 0) {
           setQuipError("No family-safe ideas came back — try again.");

@@ -63,13 +63,6 @@ class DropOut(BaseModel):
     published_at: datetime | None
 
 
-class QuipsOut(BaseModel):
-    """Candidate one-liner shirt slogans generated from a trend. The operator
-    picks one to paste as `design_copy` — the model proposes, a human disposes."""
-
-    quips: list[str]
-
-
 class DesignSubmission(BaseModel):
     """Operator-pasted design copy. ``extra="forbid"`` rejects unexpected fields."""
 

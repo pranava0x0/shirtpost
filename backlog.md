@@ -102,17 +102,17 @@ The alternatives, if ever needed:
 
 ## Copy generation (shipped 2026-07-06)
 
-- **Funny one-liner generator** — `POST /api/trends/{id}/quips` asks Claude (Haiku by default,
+- **Funny one-liner generator** — the Studio "Generate ideas" button asks Claude (Haiku by default,
   `QUIP_MODEL` for Sonnet) for a batch of banger shirt slogans riffed on a trend, family-safe
-  filtered, dedup'd, length-capped. The Studio "Generate ideas" button renders them as pickable
-  chips; the operator still chooses (model proposes, human disposes). Fails loud (503) with no key.
+  filtered, dedup'd, length-capped. Runs in a Next.js server route (`frontend/app/api/quips/route.ts`)
+  so `ANTHROPIC_API_KEY` lives with the dashboard server, never on the public FastAPI admin API
+  (**done** — the owner's "no key on the backend" constraint). The operator still picks (model
+  proposes, human disposes). Fails loud (503) with no key.
 - Follow-ups (priority: low): cache quips by trend term to avoid re-billing repeat clicks; a
   regenerate/"more like this" control; let the operator tune the count from the UI.
-- **Keep `ANTHROPIC_API_KEY` off the FastAPI backend** (priority: high — owner's constraint).
-  The interim `/quips` impl reads the key on FastAPI. Target: move quip generation server-side in
-  Next.js (a route handler that calls Claude) so the key lives only with the dashboard server and
-  never on the public admin API — same shape as the admin-auth deferral (route the dashboard through
-  Next.js server-side so tokens stay server-only). Until then, don't deploy the backend with the key.
+- **Family blocklist is duplicated** (priority: low) across `backend/app/config.py` and
+  `frontend/lib/quips.ts` (the output filter) — kept in sync by hand. A drift only over-blocks, but
+  if it grows, expose one source (e.g. a backend `/config/family-blocklist` the route reads once).
 - **Wikipedia date fallback** (priority: low). The source reads `-1 day`; if that day's pageviews
   aren't published yet the source is empty that sweep (now logged). Try `-2` on a 404.
 - **github_pages: webhook over 2-min poll** (priority: low). `_wait_until_live` blocks a worker thread

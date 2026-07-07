@@ -45,35 +45,6 @@ def test_submit_unknown_trend_404():
     assert resp.status_code == 404
 
 
-def test_quips_unknown_trend_404():
-    with TestClient(app) as client:
-        resp = client.post("/api/trends/999999/quips")
-    assert resp.status_code == 404
-
-
-def test_quips_without_api_key_fails_loud_503():
-    # No ANTHROPIC_API_KEY in the test env -> the generator can't run, and the
-    # endpoint says so (503) rather than silently returning nothing.
-    trend_id = _seed_trend("layoffs", 500.0)
-    with TestClient(app) as client:
-        resp = client.post(f"/api/trends/{trend_id}/quips")
-    assert resp.status_code == 503
-    assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
-
-
-def test_quips_happy_path_returns_candidates(monkeypatch):
-    from app.api import routes
-
-    trend_id = _seed_trend("in my villain era", 500.0)
-    monkeypatch.setattr(
-        routes, "generate_quips", lambda *a, **k: ["we are so back", "touch grass"]
-    )
-    with TestClient(app) as client:
-        resp = client.post(f"/api/trends/{trend_id}/quips")
-    assert resp.status_code == 200
-    assert resp.json() == {"quips": ["we are so back", "touch grass"]}
-
-
 def test_submit_creates_pending_drop():
     trend_id = _seed_trend("we are so back", 500.0)
     with TestClient(app) as client:

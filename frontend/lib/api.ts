@@ -23,11 +23,36 @@ export const api = {
   getObservations: (trendId: number) =>
     http<TrendObservation[]>(`/trends/${trendId}/observations`),
   triggerSweep: () => http<{ touched: number }>("/radar/sweep", { method: "POST" }),
-  generateQuips: (trendId: number, count?: number) =>
-    http<{ quips: string[] }>(
-      `/trends/${trendId}/quips${count ? `?count=${count}` : ""}`,
-      { method: "POST" },
-    ),
+  // Hits the Next.js server route (same origin — NOT the FastAPI backend), so
+  // the Anthropic key stays with the dashboard server. Sends the trend fields
+  // the browser already has; no round-trip to FastAPI.
+  generateQuips: async (
+    trend: Pick<Trend, "term" | "source" | "measurement">,
+    count?: number,
+  ): Promise<{ quips: string[] }> => {
+    const res = await fetch("/api/quips", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        term: trend.term,
+        source: trend.source,
+        measurement: trend.measurement,
+        ...(count ? { count } : {}),
+      }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      let detail = body;
+      try {
+        detail = (JSON.parse(body) as { detail?: string }).detail ?? body;
+      } catch {
+        // non-JSON error body — use the raw text
+      }
+      throw new Error(detail.slice(0, 300));
+    }
+    return (await res.json()) as { quips: string[] };
+  },
   submitDesign: (trendId: number, designCopy: string) =>
     http<Drop>(`/trends/${trendId}/submit`, {
       method: "POST",

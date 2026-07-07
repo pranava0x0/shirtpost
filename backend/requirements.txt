@@ -24,7 +24,3 @@ feedparser==6.0.11
 # Rasterizes the SVG print source to a transparent PNG for Printful (which rejects
 # SVG). Uses Pillow's bundled scalable font — no system cairo, no vendored binary.
 pillow==12.3.0
-# Official Anthropic SDK — generates funny one-liner shirt copy from trends
-# (app/copy/generate.py). Key is read from ANTHROPIC_API_KEY only, never logged.
-# Advisory-swept 2026-07-06 (not named in the index); see security.md.
-anthropic==0.116.0

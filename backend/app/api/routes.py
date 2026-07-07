@@ -14,17 +14,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.copy.generate import QuipConfigError, QuipError, generate_quips
 from app.database import SessionLocal, get_session
 from app.factory.pipeline import FactoryPipeline
 from app.models import Drop, DropStatus, Trend, TrendObservation
-from app.schemas import (
-    DesignSubmission,
-    DropOut,
-    QuipsOut,
-    TrendObservationOut,
-    TrendOut,
-)
+from app.schemas import DesignSubmission, DropOut, TrendObservationOut, TrendOut
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -137,33 +130,6 @@ def get_drop(drop_id: int, session: Session = Depends(get_session)) -> Drop:
     if drop is None:
         raise HTTPException(status_code=404, detail="drop not found")
     return drop
-
-
-@router.post("/trends/{trend_id}/quips", response_model=QuipsOut)
-def generate_trend_quips(
-    trend_id: int,
-    count: int | None = None,
-    session: Session = Depends(get_session),
-) -> QuipsOut:
-    """Propose funny one-liner shirt slogans for a trend via Claude. The operator
-    picks one and submits it as design copy — this never auto-fires the Factory."""
-    trend = session.get(Trend, trend_id)
-    if trend is None:
-        raise HTTPException(status_code=404, detail="trend not found")
-    try:
-        quips = generate_quips(
-            trend.term,
-            source=trend.source,
-            measurement=trend.measurement,
-            count=count,
-        )
-    except QuipConfigError as exc:
-        # Not configured (no key) — fail loud so the operator knows to paste copy.
-        raise HTTPException(status_code=503, detail=str(exc))
-    except QuipError as exc:
-        # The model ran but returned nothing usable — a real upstream failure.
-        raise HTTPException(status_code=502, detail=str(exc))
-    return QuipsOut(quips=quips)
 
 
 @router.post("/radar/sweep")

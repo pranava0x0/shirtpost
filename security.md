@@ -3,7 +3,20 @@
 Source: https://pranava0x0.github.io/vibe-coding-security/llms-ctx.txt
 Refresh if > 7 days old, or before any new dependency add / scaffold / CDN asset / GitHub Action / fetched install script.
 
-## Sweep 2026-07-06 — LLM quip generator dependency
+## Sweep 2026-07-06 — quip generation moved to the Next.js server
+
+Triggered by: moving quip generation off FastAPI to a Next.js server route so the
+Anthropic key lives only with the dashboard server (owner constraint), which adds
+`@anthropic-ai/sdk` to the frontend. Advisory index re-checked 2026-07-06.
+
+- **`@anthropic-ai/sdk==0.110.0`** — NOT named in the index. Cleared for use.
+  Pinned exact (`--save-exact`, no `^`), lockfile-installed. Removed the Python
+  `anthropic` dep from the backend in the same change (key no longer on FastAPI).
+- Key read as `ANTHROPIC_API_KEY` (server env, **never** `NEXT_PUBLIC_*` — that
+  would ship it to the browser) inside the route only; not in the client zod env.
+- No other index matches; the Starlette BadHost note below still stands.
+
+## Sweep 2026-07-06 — LLM quip generator dependency (superseded — key moved off backend)
 
 Triggered by: adding the official `anthropic` SDK to `backend/requirements.txt` to
 generate funny one-liner shirt copy from trends. Advisory index fetched 2026-07-06.
