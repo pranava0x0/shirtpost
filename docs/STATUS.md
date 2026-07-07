@@ -13,7 +13,7 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
 ## Verified (all green, 2026-07-06)
 
-- Backend: `pytest` = **94 passed** on CPython 3.12 (was 30 at scaffold); the
+- Backend: `pytest` = **98 passed** on CPython 3.12 (was 30 at scaffold); the
   Wikipedia parser is also live-validated against the real API.
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
@@ -36,6 +36,25 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 - **Hype Score fix** — found by *running* it: the spec's `velocity × volume`
   zeroed every score on the second identical sweep. Rebased on a volume base
   with a capped velocity boost; verified live to hold across re-sweeps.
+
+## Merch humor: LLM quip generator (this branch)
+
+- **Funny one-liner copy from trends** — the design copy was operator-pasted
+  "from your LLM"; nothing funny was proposed. The Studio "Generate ideas" button
+  asks Claude for a batch of banger shirt slogans riffed on the trend, runs each
+  through the Radar's family-safe gate, dedup + length-caps, and renders them as
+  pickable chips → fills the copy box (model proposes, human picks). Seeds in
+  `radar/sources.py` freshened toward current, wearable bangers (kept "we are so
+  back" / "delulu is the solulu").
+- **The key lives on the dashboard, not the backend.** Generation runs in a
+  Next.js server route (`frontend/app/api/quips/route.ts`, `@anthropic-ai/sdk`);
+  the browser POSTs the trend fields it already has to that same-origin route.
+  `ANTHROPIC_API_KEY` is read there only (server env — **never** `NEXT_PUBLIC_*`),
+  so it never touches the public FastAPI admin API. Fails loud (503) with no key;
+  Haiku by default (`QUIP_MODEL` → Sonnet for wittier). The Python `anthropic`
+  dep and the old `/quips` FastAPI endpoint were removed. Pure filter/parse logic
+  lives in `frontend/lib/quips.ts`. Advisory-swept: `@anthropic-ai/sdk==0.110.0`
+  (+ a `zod` bump to `3.25.76` for its peer range), see `security.md`.
 
 ## Phase 1.5 improvements (this branch)
 

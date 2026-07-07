@@ -121,6 +121,10 @@ class Settings(BaseSettings):
     x_access_token: str | None = None
     x_access_token_secret: str | None = None
 
+    # Copy generation (funny one-liner shirt slogans) lives in the Next.js
+    # dashboard server, not here — the Anthropic key must never touch this public
+    # admin API. See frontend/app/api/quips/route.ts and backlog.md.
+
     # --- App ----------------------------------------------------------------
     user_agent: str = "ShirtPostRadar/0.1 (+https://github.com/pranava0x0/shirtpost)"
 
