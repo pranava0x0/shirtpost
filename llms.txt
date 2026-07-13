@@ -9,6 +9,7 @@
 - [backlog.md](backlog.md): Deferred ideas and Phase 2+ work, with priorities.
 - [issues.md](issues.md): Bug audit trail — each bug's root cause, fix, commit, and regression test.
 - [docs/PLAN.md](docs/PLAN.md): The $0-to-start Phase 2→live build-out plan, with a progress banner.
+- [docs/TRENDS-DISCOVERY-SPEC.md](docs/TRENDS-DISCOVERY-SPEC.md): V2 spec (top backlog item) — scheduled cloud trend-discovery routine, shirt-worthiness rubric, copy generation v2, merch variety.
 - [docs/SESSION-HISTORY.md](docs/SESSION-HISTORY.md): How the build-out was done — agents/tools used, decisions, gotchas.
 
 ## Scraper Engine (The Radar)
@@ -44,5 +45,7 @@
 - [TrendCard.tsx](frontend/components/TrendCard.tsx): Client component for pasting design copy, firing the factory, retrying a failed drop, and showing the hype sparkline + within-source meter.
 - [Sparkline.tsx](frontend/components/Sparkline.tsx): Dependency-free inline SVG sparkline of a trend's recent hype scores.
 - [sources.ts](frontend/lib/sources.ts): Human labels for radar source ids used by the per-source lanes.
+- [quips.ts](frontend/lib/quips.ts): Pure quip-generation logic — prompt builder, JSON batch parser, family-safe/dedup/length filter (mirrors the backend blocklist).
+- [quips route.ts](frontend/app/api/quips/route.ts): Next.js server route calling Claude for funny one-liner shirt copy; the only place `ANTHROPIC_API_KEY` is read (never the FastAPI backend).
 - [api.ts](frontend/lib/api.ts): Typed fetch client for the FastAPI backend (no third-party HTTP deps).
 - [env.ts](frontend/lib/env.ts): Zod-validated client environment configuration.

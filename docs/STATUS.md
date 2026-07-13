@@ -1,6 +1,6 @@
 # ShirtPost — Phase 1 status / resume point
 
-_Last updated: 2026-07-05_
+_Last updated: 2026-07-12_
 
 ## Where things stand
 
@@ -117,6 +117,12 @@ npm run dev                                   # http://localhost:3000
 
 ## Next-up gaps (full list in backlog.md)
 
+0. **V2 fun overhaul — spec'd, not started** (top backlog item, 2026-07-12): the v1
+   audit found the radar surfaces attention (news/pageviews) rather than wearable
+   phrases, the meme seeds are stale, and quip gen is blind one-shot Haiku. Full
+   plan in [TRENDS-DISCOVERY-SPEC.md](TRENDS-DISCOVERY-SPEC.md): a scheduled cloud
+   discovery routine (X via aggregators, Bluesky, Mastodon, KYM → judged JSONL →
+   daily PR → `discovered` radar source), copy generation v2, merch variety. [high]
 1. **Real-mode Printful needs a human step, not code**: a free Printful account +
    PNG hosting (`PRINT_FILE_STORAGE=github_pages` → create the artifacts repo + a
    token, or deploy so `local` is publicly reachable). The pipeline + storage code
