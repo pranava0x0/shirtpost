@@ -93,3 +93,45 @@ def test_light_garment_svg_is_not_white_on_white():
 def test_dark_garment_svg_keeps_white_ink():
     svg = PrintfulClient.build_text_svg("we are so back", garment_color="black")
     assert 'fill="#FFFFFF"' in svg
+
+
+# --- Layout parity: the debug SVG must depict the same layout the PNG prints ----
+
+from app.factory.layouts import LAYOUTS  # noqa: E402
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_svg_layout_stays_within_canvas(layout):
+    svg = PrintfulClient.build_text_svg("crashing out respectfully", layout=layout)
+    ys, fs = _baselines_and_fontsize(svg)
+    assert ys, f"{layout} rendered no text"
+    assert all(0 <= y <= CANVAS_H for y in ys), f"{layout} baseline off-canvas: {ys}"
+    ET.fromstring(svg)  # well-formed
+
+
+def test_svg_oversized_lowercases_like_the_png():
+    # Regression: the PNG lowercased 'oversized' copy while the SVG kept case,
+    # so the debug source disagreed with the print. Now both lowercase.
+    svg = PrintfulClient.build_text_svg("NASA Dropped The Ball", layout="oversized")
+    assert ">nasa" in svg.lower()
+    assert "NASA" not in svg  # original case gone, matching the PNG
+
+
+def test_svg_boxed_draws_an_outline_rect():
+    svg = PrintfulClient.build_text_svg("boxed up", layout="boxed")
+    assert "<rect" in svg and 'fill="none"' in svg  # the framing outline
+    ET.fromstring(svg)
+
+
+def test_svg_top_left_is_left_anchored_not_centered():
+    left = PrintfulClient.build_text_svg("left chest", layout="top_left")
+    centered = PrintfulClient.build_text_svg("left chest", layout="centered")
+    assert 'text-anchor="start"' in left  # left-aligned
+    assert 'text-anchor="middle"' in centered
+    assert left != centered  # the two layouts genuinely differ
+
+
+def test_unknown_svg_layout_falls_back_to_centered():
+    assert PrintfulClient.build_text_svg("x", layout="nope") == PrintfulClient.build_text_svg(
+        "x", layout="centered"
+    )

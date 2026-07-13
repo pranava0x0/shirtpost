@@ -80,10 +80,34 @@ def list_trends(
     session: Session = Depends(get_session),
 ) -> list[Trend]:
     limit = max(1, min(limit, 200))
-    stmt = select(Trend).order_by(Trend.hype_score.desc()).limit(limit)
     if source:
-        stmt = stmt.where(Trend.source == source)
-    trends = list(session.scalars(stmt).all())
+        trends = list(
+            session.scalars(
+                select(Trend)
+                .where(Trend.source == source)
+                .order_by(Trend.hype_score.desc())
+                .limit(limit)
+            ).all()
+        )
+    else:
+        # Top `limit` PER SOURCE, not a global top-N. Hype is not comparable across
+        # sources (the UI lanes by source), so a global order_by+limit would starve
+        # a low-hype lane — the `discovered` source's 0..100 scores sink below the
+        # attention sources' raw volumes and get trimmed out entirely.
+        rn = (
+            func.row_number()
+            .over(partition_by=Trend.source, order_by=Trend.hype_score.desc())
+            .label("rn")
+        )
+        ranked = select(Trend.id, rn).subquery()
+        ids = session.execute(
+            select(ranked.c.id).where(ranked.c.rn <= limit)
+        ).scalars().all()
+        trends = list(
+            session.scalars(
+                select(Trend).where(Trend.id.in_(ids)).order_by(Trend.hype_score.desc())
+            ).all()
+        )
 
     # Enrich with the within-source normalized hype and the sparkline series.
     bounds = _source_bounds(session)
@@ -175,7 +199,12 @@ def submit_design(
         raise HTTPException(
             status_code=409, detail="a drop for this trend is already in flight"
         )
-    drop = Drop(trend_id=trend.id, design_copy=body.design_copy, status=DropStatus.PENDING)
+    drop = Drop(
+        trend_id=trend.id,
+        design_copy=body.design_copy,
+        layout=body.layout,
+        status=DropStatus.PENDING,
+    )
     session.add(drop)
     try:
         # Authoritative guard: the partial unique index rejects a concurrent

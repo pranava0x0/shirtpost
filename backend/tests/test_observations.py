@@ -106,6 +106,29 @@ def test_normalized_hype_is_per_source_and_bounded():
         assert 0.0 <= t["normalized_hype"] <= 1.0
 
 
+def test_low_hype_source_not_starved_by_global_limit():
+    # Regression: /trends used a GLOBAL order_by(hype).limit(N), so a low-hype lane
+    # (discovered's 0..100 scores) could be trimmed out entirely by high-volume
+    # sources. It must now return the top-N PER source.
+    from app.models import utcnow
+
+    with SessionLocal() as s:
+        for i in range(5):  # 5 high-hype attention trends
+            s.add(Trend(term=f"big{i}", term_raw=f"big{i}", source="google_trends",
+                        measurement="search_traffic", volume=100_000 + i,
+                        hype_score=100_000.0 + i, first_seen_at=utcnow(), last_seen_at=utcnow()))
+        s.add(Trend(term="tiny discovered", term_raw="tiny discovered", source="discovered",
+                    measurement="shirt_score", volume=70, hype_score=70.0,
+                    first_seen_at=utcnow(), last_seen_at=utcnow()))
+        s.commit()
+    with TestClient(app) as client:
+        # limit=3: a global top-3 would be all google_trends, starving discovered.
+        rows = client.get("/api/trends?limit=3").json()
+    seen = {r["source"] for r in rows}
+    assert "discovered" in seen, "low-hype lane was starved by the global limit"
+    assert "google_trends" in seen
+
+
 def test_trends_can_be_filtered_by_source():
     run_sweep_once()  # simulated
     with SessionLocal() as s:

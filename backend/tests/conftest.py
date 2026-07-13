@@ -16,6 +16,10 @@ _ARTIFACTS_DIR = _HERE / ".pytest_artifacts"
 
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB}"
 os.environ["RADAR_ENABLED"] = "false"
+# Pin to the offline seed source so run_sweep_once() never hits the network
+# (the app default now also enables google_trends + discovered). Tests that
+# exercise those sources drive them directly with fixtures.
+os.environ["RADAR_SOURCES"] = '["simulated"]'
 os.environ["ALLOWED_HOSTS"] = '["testserver","localhost","127.0.0.1"]'
 os.environ["RADAR_MIN_REQUEST_INTERVAL_SECONDS"] = "0"
 os.environ["RADAR_CACHE_DIR"] = str(_CACHE_DIR)

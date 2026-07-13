@@ -1,5 +1,24 @@
 # Backlog
 
+## ⬆ Top priority — next up
+
+- **V2: trend-discovery cloud routine + fun overhaul** (priority: **high — top item**, added
+  2026-07-12; **code parts shipped 2026-07-13**). Plan: [docs/TRENDS-DISCOVERY-SPEC.md](docs/TRENDS-DISCOVERY-SPEC.md).
+  - ✅ **T1** `discovered` radar adapter + `Trend.context`/`angles`/`ip_risk` + hype-bypass for
+    judged scores; `google_trends` RSS enabled. (See STATUS.md "V2 … shipped".)
+  - ✅ **Part B** copy v2 — generate (Sonnet, 4 angles, grounded) → judge (Haiku), cliché
+    kill-list + IP guard, hall-of-fame anchors, cache-by-term + rate limit, **vitest** harness.
+    (Absorbed the three old "Copy generation" follow-ups.)
+  - ✅ **Part C** merch variety — 4 render layouts, exposed as a Studio dropdown (layout
+    default rotates). Per-drop *garment* was pulled in the 2026-07-13 CR: it changed only the
+    ink, not the ordered Printful variant, so it printed invisibly (see issues.md).
+  - ⬜ **T0 (human-gated, do next):** verify each source contract by hand (X aggregators, KYM,
+    Bluesky, Mastodon), owner decides the Reddit stance, apply for the Google Trends alpha.
+  - ⬜ **Create the scheduled cloud routine** via `/schedule` with the A6 prompt (owner action —
+    it opens the daily discovery PRs the `discovered` adapter reads).
+  - ⬜ **T2** deterministic collectors (Bluesky/Mastodon/RSS → code) and **T3** feedback loop
+    (operator picks + X engagement → source weighting) — wait on T1 real runs + posting volume.
+
 ## Data access (deferred from Phase 1 scaffold decision)
 
 The Phase 1 spec listed both SQLAlchemy (Python) and Prisma (Next.js) over one DB.
@@ -17,6 +36,12 @@ The alternatives, if ever needed:
 
 ## Factory pipeline gaps
 
+- **Per-drop garment variety needs a Printful color→variant map** (priority: medium). The
+  2026-07-13 CR pulled the garment picker: changing the ink without changing the ordered
+  Printful *variant* prints invisibly. To offer garments per drop, add a
+  `{color -> variant_id}` map (owner supplies catalog variant ids), select the variant in
+  `create_mockup_task`/`sync_product`, and derive ink from the chosen garment. Layout variety
+  already ships and is safe (same garment, different placement).
 - **Real-mode Printful hosting setup** (priority: high — a human step, not code, PLAN.md 2A #2/#3).
   The storage code is done (`PRINT_FILE_STORAGE=local|github_pages`); what's left is external:
   create the GitHub Pages artifacts repo + a token (or deploy so `local` is publicly reachable),
@@ -101,7 +126,12 @@ The alternatives, if ever needed:
   hold the key on the backend. It would either run in a Next.js server route (like the quip
   generator) with FastAPI calling it, or move the whole trend-ingest safety gate server-side there.
 
-## Copy generation (shipped 2026-07-06)
+## Copy generation (shipped 2026-07-06; overhauled by v2 Part B 2026-07-13)
+
+> The v1 generator below was single-stage Haiku. **v2 Part B** replaced it with a
+> two-stage generate (Sonnet) → judge (Haiku) path grounded in the trend context,
+> with a cliché kill-list, IP guard, and hall-of-fame anchors. The default
+> `QUIP_MODEL` is now Sonnet. See the top backlog item + STATUS.md.
 
 - **Funny one-liner generator** — the Studio "Generate ideas" button asks Claude (Haiku by default,
   `QUIP_MODEL` for Sonnet) for a batch of banger shirt slogans riffed on a trend, family-safe
@@ -109,21 +139,30 @@ The alternatives, if ever needed:
   so `ANTHROPIC_API_KEY` lives with the dashboard server, never on the public FastAPI admin API
   (**done** — the owner's "no key on the backend" constraint). The operator still picks (model
   proposes, human disposes). Fails loud (503) with no key.
-- Follow-ups (priority: low): cache quips by trend term to avoid re-billing repeat clicks; a
-  regenerate/"more like this" control; let the operator tune the count from the UI.
-- **Rate-limit / gate `/api/quips`** (priority: medium). The route spends real Anthropic tokens per
-  call and has no auth or rate limit — anyone who can reach the dashboard can burn budget. Add a
-  simple per-IP/session limit (or fold it into the eventual dashboard auth). Pairs with the
-  cache-by-trend-term item above.
-- **Frontend test runner for `lib/quips.ts`** (priority: medium). The parse/family-filter/dedup/cap
-  logic is pure and safety-relevant but untested — the frontend has no test harness (its Python
-  predecessor did have tests, removed with the move). Add vitest (advisory-sweep it) + `quips.test.ts`
-  covering: fenced/malformed JSON, non-`{quips}` shape, `Pornhub` over-block, quote-stripping, dedup,
-  length cap, count cap. Deliberately deferred out of the merge to avoid bolting on a framework at the
-  last minute.
+- Follow-ups: ~~cache quips by trend term~~ (**done, v2 Part B** — in-process cache-by-term);
+  a regenerate/"more like this" control (priority: low); let the operator tune the count from
+  the UI (priority: low).
+- ~~**Rate-limit / gate `/api/quips`**~~ (**done, v2 Part B** — in-process sliding-window rate
+  limit on the route; a real per-session limit still folds into the eventual dashboard auth).
+- ~~**Frontend test runner for `lib/quips.ts`**~~ (**done, v2 Part B** — added `vitest`
+  (advisory-swept 2026-07-12) + `frontend/lib/quips.test.ts` (21 tests) covering
+  parse/family/cliché/IP/dedup/cap/anchor paths; `npm test`).
 - **Family blocklist is duplicated** (priority: low) across `backend/app/config.py` and
   `frontend/lib/quips.ts` (the output filter) — kept in sync by hand. A drift only over-blocks, but
   if it grows, expose one source (e.g. a backend `/config/family-blocklist` the route reads once).
+  The 2026-07-13 CR flagged the missing drift guard (CLAUDE.md "test that the copies match") — a
+  cheap start is a test asserting the two lists are byte-identical.
+- **`/api/quips` route + `hallOfFame` have thin tests** (priority: medium, from 2026-07-13 CR).
+  Only the pure `lib/quips.ts` / `lib/hallOfFame.ts` helpers are unit-tested; the two-stage
+  generate→judge orchestration, the rate limiter, the cache, and the judge-fallbacks in
+  `app/api/quips/route.ts` are untested (need mocked Anthropic calls). A regression in the
+  rate limiter or the "judge returned nothing → fall back to pool" path would ship silently.
+- **Hall-of-fame append is not atomic** (priority: low, from CR). Read-modify-write on every
+  submit; two near-simultaneous submits can lose-update. Fine for a single operator; if it ever
+  matters, write via a temp file + rename, or serialize appends.
+- **Layout containment tests only sample corners** (priority: low, from CR). `test_render.py`
+  checks the 4 corners; an edge-midpoint bleed (most likely for `boxed`/`oversized`) would pass.
+  Sample edge midpoints too if a layout is ever added.
 - **Wikipedia date fallback** (priority: low). The source reads `-1 day`; if that day's pageviews
   aren't published yet the source is empty that sweep (now logged). Try `-2` on a 404.
 - **github_pages: webhook over 2-min poll** (priority: low). `_wait_until_live` blocks a worker thread

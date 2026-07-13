@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Sparkline } from "@/components/Sparkline";
 import { api } from "@/lib/api";
+import { LAYOUT_OPTIONS } from "@/lib/merch";
 import type { Drop, DropStatus, Trend } from "@/lib/types";
 
 const STATUS_STYLES: Record<DropStatus, string> = {
@@ -37,7 +38,13 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   const [retrying, startRetry] = useTransition();
   const [quips, setQuips] = useState<string[]>([]);
   const [quipError, setQuipError] = useState<string | null>(null);
+  const [quipDropped, setQuipDropped] = useState(0);
   const [generating, startGenerating] = useTransition();
+  // Default rotates by trend id so consecutive cards don't all look identical.
+  // `trend.id` is a positive DB id; guard the modulo anyway so a bad id can't crash.
+  const [layout, setLayout] = useState(
+    LAYOUT_OPTIONS[Math.abs(trend.id) % LAYOUT_OPTIONS.length].value,
+  );
 
   // Adopt a newer drop coming from the server (e.g. after router.refresh()).
   useEffect(() => {
@@ -55,6 +62,10 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         setDrop(fresh);
         if (!isInFlight(fresh.status)) {
           clearInterval(timer);
+          // Only copy that actually SHIPPED becomes house-voice — record on
+          // publish, not on submit, so a Factory failure doesn't poison the
+          // hall of fame. Deduped server-side, so re-observing is a no-op.
+          if (fresh.status === "published") api.recordHallOfFame(fresh.design_copy);
           router.refresh();
         }
       } catch {
@@ -76,7 +87,10 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
     setError(null);
     startTransition(async () => {
       try {
-        const created = await api.submitDesign(trend.id, value);
+        const created = await api.submitDesign(trend.id, value, { layout });
+        // Hall-of-fame recording happens when the drop reaches "published" (see the
+        // poll effect above), not here — a submitted-but-failed drop must not seed
+        // the house voice.
         setCopy("");
         setDrop(created);
       } catch (e) {
@@ -86,11 +100,16 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   }
 
   function generate() {
+    // Clear any prior results so a failed retry can't leave stale quips + a stale
+    // "N filtered out" count sitting next to the new error.
     setQuipError(null);
+    setQuips([]);
+    setQuipDropped(0);
     startGenerating(async () => {
       try {
-        const { quips: ideas } = await api.generateQuips(trend);
+        const { quips: ideas, dropped } = await api.generateQuips(trend);
         setQuips(ideas);
+        setQuipDropped(dropped ?? 0);
         if (ideas.length === 0) {
           setQuipError("No family-safe ideas came back — try again.");
         }
@@ -118,7 +137,17 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   return (
     <li className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold">{trend.term}</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          {trend.term}
+          {trend.ip_risk ? (
+            <span
+              className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300"
+              title="Built on a real person / brand / franchise / lyric — riff around the name, don't print it"
+            >
+              ⚠ IP risk
+            </span>
+          ) : null}
+        </h2>
         <span className="flex items-center gap-2">
           <Sparkline points={trend.spark} />
           <span
@@ -172,6 +201,12 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         </p>
       ) : null}
 
+      {trend.context ? (
+        <p className="mt-2 border-l-2 border-neutral-700 pl-2 text-xs italic text-neutral-400">
+          {trend.context}
+        </p>
+      ) : null}
+
       <div className="mt-3 flex items-center gap-3">
         <button
           type="button"
@@ -188,6 +223,12 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
 
       {quipError ? (
         <p className="mt-2 text-sm text-amber-400">{quipError}</p>
+      ) : null}
+
+      {quips.length > 0 && quipDropped > 0 ? (
+        <p className="mt-2 text-[11px] text-neutral-500">
+          {quipDropped} clich&eacute;/off-brand line{quipDropped === 1 ? "" : "s"} filtered out
+        </p>
       ) : null}
 
       {quips.length > 0 ? (
@@ -223,6 +264,23 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
           placeholder="Pick an idea above, or paste your own copy…"
           className="w-full resize-y rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-500"
         />
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-3">
+        <label className="flex flex-col text-[11px] uppercase tracking-wide text-neutral-500">
+          Layout
+          <select
+            value={layout}
+            onChange={(e) => setLayout(e.target.value)}
+            className="mt-1 min-h-[44px] rounded-lg border border-neutral-700 bg-neutral-950 px-2 text-sm normal-case text-neutral-200 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+          >
+            {LAYOUT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div className="mt-2 flex items-center gap-3">

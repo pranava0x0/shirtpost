@@ -9,26 +9,30 @@
 - [backlog.md](backlog.md): Deferred ideas and Phase 2+ work, with priorities.
 - [issues.md](issues.md): Bug audit trail — each bug's root cause, fix, commit, and regression test.
 - [docs/PLAN.md](docs/PLAN.md): The $0-to-start Phase 2→live build-out plan, with a progress banner.
+- [docs/TRENDS-DISCOVERY-SPEC.md](docs/TRENDS-DISCOVERY-SPEC.md): V2 spec (top backlog item) — scheduled cloud trend-discovery routine, shirt-worthiness rubric, copy generation v2, merch variety.
 - [docs/SESSION-HISTORY.md](docs/SESSION-HISTORY.md): How the build-out was done — agents/tools used, decisions, gotchas.
 
 ## Scraper Engine (The Radar)
 
 - [config.py](backend/app/config.py): Strict env-validated runtime settings (pydantic-settings).
-- [sources.py](backend/app/radar/sources.py): Feed adapters (simulated + Wikipedia most-viewed, ToS-clean) that HTML-strip titles, plus a family-friendly keyword filter applied before the queue.
+- [sources.py](backend/app/radar/sources.py): Feed adapters (simulated + Wikipedia most-viewed + Google Trends RSS + the `discovered` cloud-routine adapter) that HTML-strip titles, plus a family-friendly keyword filter applied before the queue.
 - [fetch.py](backend/app/radar/fetch.py): Live-source HTTP with disk caching, per-host rate limiting, and 429 backoff.
-- [scoring.py](backend/app/radar/scoring.py): Hype Score — a volume base with a capped velocity boost, so steady trends never collapse to zero.
+- [scoring.py](backend/app/radar/scoring.py): Hype Score — a volume base with a capped velocity boost, so steady trends never collapse to zero; a judged `shirt_score` bypasses the boost (`hype_for`).
 - [worker.py](backend/app/radar/worker.py): Background poller that upserts trends and recomputes scores per sweep.
 
 ## Data Layer
 
-- [models.py](backend/app/models.py): SQLAlchemy ORM models — trends, drops, and the append-only `trend_observations` history; the single source of truth.
+- [models.py](backend/app/models.py): SQLAlchemy ORM models — trends (with the `discovered`-source `context`/`angles`/`ip_risk` enrichment), drops (with per-drop `layout`/`garment_color`), and the append-only `trend_observations` history; the single source of truth.
 - [schemas.py](backend/app/schemas.py): Pydantic request/response schemas validated before any DB write.
-- [database.py](backend/app/database.py): Engine and session wiring; FastAPI solely owns the database.
+- [database.py](backend/app/database.py): Engine and session wiring; FastAPI solely owns the database; a lightweight additive-column migration runs in `init_db`.
+- [data/trends/discovered.jsonl](data/trends/discovered.jsonl): Append-only judged phrases the cloud discovery routine lands by PR; read by the `discovered` radar adapter (windowed, deduped).
+- [data/copy/hall-of-fame.json](data/copy/hall-of-fame.json): Shipped design copy used as few-shot house-voice anchors for quip generation; auto-appended on every submit.
 
 ## Integration Services (The Factory)
 
 - [printful.py](backend/app/factory/printful.py): Printful client — builds the SVG source, generates mockups, syncs the store catalog; XML-escaped payloads and garment-contrast ink selection.
-- [render.py](backend/app/factory/render.py): Rasterizes the design copy to a transparent print-ready PNG with Pillow (Printful rejects SVG); bundled scalable font, no system libs.
+- [render.py](backend/app/factory/render.py): Rasterizes the design copy to a transparent print-ready PNG with Pillow (Printful rejects SVG); bundled scalable font, no system libs; 4 layout templates (centered/left-chest/oversized/boxed).
+- [layouts.py](backend/app/factory/layouts.py): Shared layout geometry (region/scale/case/box per template) used by both renderers, so the debug SVG source and the printed PNG always agree.
 - [storage.py](backend/app/factory/storage.py): Hosts the PNG where Printful can fetch it — `local` (served by this backend) or `github_pages` (push + poll until live); returns the public URL.
 - [xcom.py](backend/app/factory/xcom.py): X.com — prefilled Web Intent URL (free default) and the v2 media-upload + tweet client for auto-post (`api`) mode.
 - [pipeline.py](backend/app/factory/pipeline.py): Idempotent Factory pipeline — builds SVG + PNG, Printful mockup/sync, then a mode-aware broadcast (intent/api); each step commits as it lands and is skipped on retry, so a posted tweet is never sent twice.
@@ -44,5 +48,11 @@
 - [TrendCard.tsx](frontend/components/TrendCard.tsx): Client component for pasting design copy, firing the factory, retrying a failed drop, and showing the hype sparkline + within-source meter.
 - [Sparkline.tsx](frontend/components/Sparkline.tsx): Dependency-free inline SVG sparkline of a trend's recent hype scores.
 - [sources.ts](frontend/lib/sources.ts): Human labels for radar source ids used by the per-source lanes.
+- [merch.ts](frontend/lib/merch.ts): Layout + garment option constants for the per-drop merch-variety dropdowns.
+- [quips.ts](frontend/lib/quips.ts): Pure quip-generation logic — generate/judge prompt builders, JSON batch parser, and the family-safe/cliché/IP/dedup/length filter (reports a drop count).
+- [quips.test.ts](frontend/lib/quips.test.ts): Vitest coverage for the parse/filter/cliché/IP/anchor paths.
+- [hallOfFame.ts](frontend/lib/hallOfFame.ts): Server-only read/append of the shipped-copy hall of fame (few-shot house voice).
+- [quips route.ts](frontend/app/api/quips/route.ts): Next.js server route — two-stage generate (Sonnet) → judge (Haiku) for funny one-liner shirt copy, grounded in the trend context; the only place `ANTHROPIC_API_KEY` is read (never the FastAPI backend).
+- [hall-of-fame route.ts](frontend/app/api/hall-of-fame/route.ts): Server route that appends a shipped design line to the hall of fame.
 - [api.ts](frontend/lib/api.ts): Typed fetch client for the FastAPI backend (no third-party HTTP deps).
 - [env.ts](frontend/lib/env.ts): Zod-validated client environment configuration.

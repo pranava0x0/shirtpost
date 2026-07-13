@@ -6,6 +6,107 @@ was added. Newest first.
 
 ---
 
+## 2026-07-13 — v2 critical code review (multi-agent) findings
+
+Fixes for bugs found by an 8-angle critical review of the v2 diff (T1 discovery +
+Part B copy-gen + Part C merch). All fixed on the v2 branch; tests: 136 backend +
+31 vitest passing.
+
+### Fixed
+
+- **Per-drop garment picker produced invisible prints** · `factory/pipeline.py` +
+  Part C plumbing · **design bug** · Fixed.
+  The garment dropdown set the *ink* color (`print_color_for_garment`) but the
+  Printful mockup/sync always ordered the fixed default variant (black). Picking
+  "white" rendered dark ink → printed on the black shirt → unreadable — the exact
+  white-on-white failure inverted. Removed the half-wired picker end-to-end (model
+  column, migration entry, schema, DropOut, routes, pipeline, types, api,
+  TrendCard, merch); ink now derives from the actually-ordered garment. Layout
+  variety kept. Real garment variety needs a Printful color→variant map (backlog).
+
+- **Debug SVG diverged from the printed PNG for 3 of 4 layouts** · `factory/printful.py`
+  `build_text_svg` · **code bug** · Fixed.
+  The pipeline rasterized the PNG with `layout=` but built the SVG "source" with no
+  layout, so `top_left`/`oversized`/`boxed` SVGs showed the wrong placement (and
+  `oversized` lowercased in the PNG only). Extracted the layout geometry to a shared
+  `factory/layouts.py` used by both renderers; `build_text_svg` now honors layout +
+  case. **Regression tests:** `test_factory_svg.py` (per-layout containment,
+  oversized-lowercases, boxed-rect, top_left-anchor, unknown-fallback).
+
+- **Empty quip batch was cached for 10 min** · `api/quips/route.ts` · **code bug** ·
+  Fixed. When every candidate was filtered, the empty result was cached, so the
+  UI's "try again" was a no-op for the whole TTL. Now only non-empty batches cache,
+  and expired entries are pruned on write (bounding the Map).
+
+- **Hall-of-fame trimmed append-only data by count** · `lib/hallOfFame.ts` ·
+  **design bug (CLAUDE.md "Cap by content, not count")** · Fixed. `slice(-200)`
+  silently dropped the oldest shipped-copy anchors. Now stores every line; the
+  generator samples only the newest few. **Regression test:**
+  `hallOfFame.test.ts::does NOT cap by count`.
+
+- **Discovered adapter accepted bool/negative `shirt_score`** · `radar/sources.py` ·
+  **code bug** · Fixed. `isinstance(True, int)` let JSON `true` become score 1, and
+  negatives stored a negative volume with no threshold. Now rejects bool and
+  negatives. **Regression tests:** `test_discovered.py` (bool/negative/zero).
+
+- **Discovery window was 15 days, not 14** · `radar/sources.py` `parse_discovered` ·
+  **code bug (off-by-one)** · Fixed. Both endpoints were admitted; the lower bound
+  is now exclusive. **Regression test:** `test_window_is_exactly_window_days_not_one_more`.
+
+- **`cleanAndFilter` double-counted repeated clichés** · `lib/quips.ts` · **code bug**
+  · Fixed. Dropped lines were never added to `seen`, so a repeated cliché inflated
+  the `dropped` audit count. Now records each decision. **Regression test:**
+  `quips.test.ts::counts a repeated cliché only once`.
+
+- **IP belt only caught the exact full term** · `lib/quips.ts` · **code bug** ·
+  Fixed. "Taylor Swift" (ipRisk) let "swiftie"/"taylor's version" through, and the
+  needle was untrimmed. Now trims and matches significant words too. **Regression
+  test:** `quips.test.ts::drops partial-name IP leaks`.
+
+- **`boxed` outline crossed the print safe-margin; `quipDropped` not reset on failed
+  regenerate; cache key omitted angles/source** · render/route/TrendCard · **code
+  bugs (minor)** · Fixed (clamp box to region; reset on generate; key on all prompt
+  inputs).
+
+### Regression test added for a previously-untested path
+
+- **Additive-column migration upgrade path** · `database.py` `_add_missing_columns`
+  · was only exercised via fresh `create_all`. Added `test_migration.py` (old-schema
+  DB → migrate → columns added, rows preserved as NULL, idempotent, JSON round-trip,
+  `_ADDITIVE_COLUMNS`↔model parity). Hardened the migration to trust ALTER +
+  swallow "duplicate column" rather than reflect first — SQLite's per-connection
+  schema cache made reflection disagree with the ALTER across pooled connections.
+
+### Codex bot review (round 2) — additional fixes
+
+- **Global top-N starved the discovered lane** · `api/routes.py` `list_trends` ·
+  **code bug** · Fixed. `/trends?limit=N` ordered by global `hype_score` and
+  trimmed, so the discovered lane's 0–100 scores sank below the attention sources'
+  raw volumes and could vanish. Now returns the top-N *per source* (partitioned
+  `row_number()`). **Regression test:** `test_low_hype_source_not_starved_by_global_limit`.
+- **`shirt_score` validation missed NaN/Infinity/out-of-range** · `radar/sources.py`
+  · **code bug** · Fixed. Judged scores bypass Hype, so a `500` or `NaN`
+  (`json.loads` accepts non-finite) would corrupt the lane scale. Now rejects
+  non-finite and anything outside 0–100. **Regression tests:**
+  `test_out_of_range_shirt_score_is_rejected`, `test_non_finite_shirt_score_is_rejected`.
+- **Hall of fame recorded on submit, not publish** · `TrendCard.tsx` · **code bug**
+  · Fixed. A submitted-but-failed drop seeded the house voice; recording moved to
+  the poll effect's `published` transition (deduped server-side).
+- **Empty-sweep PR had no diff to open** · `docs/TRENDS-DISCOVERY-SPEC.md` (A4/A6)
+  · **spec bug** · Fixed. The routine now always appends a run-report line to
+  `data/trends/_sweeps.jsonl` (not ingested by the adapter), so a zero-candidate
+  sweep still produces a diff and a PR.
+
+### Noted, not fixed (low severity, single-operator local tool)
+
+- Hall-of-fame append is read-modify-write with no lock (concurrent submits can
+  lose-update); `/api/quips` two-stage flow, rate limiter, and cache have no unit
+  tests (only the pure `lib/quips.ts` helpers do); layout containment tests sample
+  corners, not edge midpoints; the family blocklist is duplicated across the
+  Python/TS boundary with no drift test. Tracked in backlog.
+
+---
+
 ## 2026-07-06 — Phase 2/3 build-out + code review
 
 ### Fixed

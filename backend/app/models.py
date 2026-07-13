@@ -11,6 +11,7 @@ import enum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -57,6 +58,15 @@ class Trend(Base):
     prev_volume: Mapped[int] = mapped_column(Integer, default=0)
     velocity: Mapped[float] = mapped_column(Float, default=0.0)  # mentions/hour gained
     hype_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+
+    # Discovery-source enrichment (the "discovered" adapter). All nullable so every
+    # pre-existing row reads exactly as before the columns existed. "why this is
+    # trending" grounds the quip generator; angles are comedic-direction hints;
+    # ip_risk flags a term built on a real person/brand/franchise/lyric so copy
+    # riffs around it instead of printing it. See docs/TRENDS-DISCOVERY-SPEC.md.
+    context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    angles: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    ip_risk: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -118,6 +128,13 @@ class Drop(Base):
     trend: Mapped[Trend] = relationship(back_populates="drops")
 
     design_copy: Mapped[str] = mapped_column(Text)  # operator-authored, from their own LLM
+
+    # Merch variety (TRENDS-DISCOVERY-SPEC Part C). layout picks a render template
+    # (see factory/render.LAYOUTS). Nullable so pre-existing drops read as before;
+    # the pipeline falls back to "centered" when null. (Per-drop garment color is
+    # deferred: it must also select the ordered Printful variant, not just the ink
+    # — see backlog "garment variety needs a Printful color->variant map".)
+    layout: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # Store the enum *value* ("pending") not the name, so the partial-index
     # predicate above matches and the DB/API agree on the string.

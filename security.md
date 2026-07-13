@@ -3,6 +3,41 @@
 Source: https://pranava0x0.github.io/vibe-coding-security/llms-ctx.txt
 Refresh if > 7 days old, or before any new dependency add / scaffold / CDN asset / GitHub Action / fetched install script.
 
+## Sweep 2026-07-13 — remediate npm CVE advisories in the frontend tree
+
+`npm audit` on the v2 branch flagged 4 advisories in **pre-existing** deps (none
+introduced by the v2 work). All fixed with in-major patch bumps — no breaking
+upgrades — and re-verified: `npm audit` = **0 vulnerabilities**, and
+typecheck/lint/`next build`/vitest all still pass.
+
+- **`next` 15.5.10 → 15.5.20** — closes the high-severity batch (request
+  smuggling, SSRF via WebSocket upgrades, middleware/proxy bypasses, cache
+  poisoning, image-cache DoS, …). Latest 15.5.x; not a supply-chain compromise —
+  the advisory index (re-checked 2026-07-13) lists Next.js's May-2026 CVEs and
+  says *patch*, which this does. `eslint-config-next` bumped to 15.5.20 to match.
+- **`eslint` 9.17.0 → 9.39.5** — pulls a fixed `@eslint/plugin-kit` (>= 0.3.4),
+  closing the ConfigCommentParser ReDoS (GHSA-xffm-g5w8-qvg7).
+- **`postcss` 8.4.49 → 8.5.18** — closes the `</style>` stringify XSS
+  (GHSA-qx2v-qp2m-jg93). Next still *bundled* an older postcss internally
+  (npm's only "fix" was downgrading next to v9 — a false lead), so an
+  **`overrides: { "postcss": "8.5.18" }`** entry forces the whole tree (incl.
+  next's nested copy) to the patched version; same major, API-compatible.
+- Index re-checked 2026-07-13: none of next/eslint/eslint-config-next/
+  @eslint/plugin-kit/postcss are named as compromised — these are CVE patches,
+  not tampering. Pins stay exact; lockfile regenerated.
+
+## Sweep 2026-07-12 — vitest test harness (v2 copy-gen work)
+
+Triggered by: adding `vitest` as a frontend devDependency for `quips.test.ts`
+(the deferred vitest harness, TRENDS-DISCOVERY-SPEC Part B). Advisory index
+re-fetched 2026-07-12.
+
+- **`vitest`** — NOT named in the index. Cleared. Pinned exact, lockfile-installed.
+- The only Vite-family entry is "Vite dev-server WebSocket arbitrary file read"
+  (advisory 2026-04-06) — it concerns an *exposed* `vite` dev server, not the
+  test runner, which we never expose. No action beyond pinning a current version.
+- No other index matches; prior notes below still stand.
+
 ## Sweep 2026-07-06 — quip generation moved to the Next.js server
 
 Triggered by: moving quip generation off FastAPI to a Next.js server route so the

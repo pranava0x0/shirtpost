@@ -15,21 +15,29 @@ centered. Ink color contrasts with the garment (shared with the SVG path).
 from __future__ import annotations
 
 import io
+import logging
 from functools import lru_cache
 
 from PIL import Image, ImageDraw, ImageFont
 
+from app.factory.layouts import DEFAULT_LAYOUT, LAYOUTS, layout_spec
 from app.factory.printful import print_color_for_garment
 
+logger = logging.getLogger(__name__)
+
 # Print area in px. 1800x2400 over a ~12x16in DTG area ≈ 150 DPI, and matches the
-# position payload the mockup request sends. Kept in sync with build_text_svg.
+# position payload the mockup request sends. The SVG source (build_text_svg) shares
+# the same layout geometry via app.factory.layouts, so the two stay in sync.
 PRINT_WIDTH = 1800
 PRINT_HEIGHT = 2400
 PRINT_MARGIN = 150
 
-_MAX_FONT = 220
 _MIN_FONT = 24
 _LINE_SPACING = 1.25
+
+# Layout templates so two drops never look identical (TRENDS-DISCOVERY-SPEC Part
+# C); geometry is defined once in app.factory.layouts and shared with the SVG path.
+# "centered" is the historical default; the operator picks per drop (rotated by default).
 
 
 @lru_cache(maxsize=128)
@@ -76,6 +84,24 @@ def _wrap_to_width(words: list[str], font: ImageFont.FreeTypeFont, max_px: float
     return lines or [""]
 
 
+def _fit_lines(
+    words: list[str], avail_w: float, avail_h: float, max_font: int
+) -> tuple[list[str], ImageFont.FreeTypeFont, float]:
+    """Largest font (down from ``max_font``) whose wrapped lines fit the region on
+    both axes; falls back to the min size, keeping only the lines that fit."""
+    for fs in range(max_font, _MIN_FONT - 1, -4):
+        candidate_font = _font(fs)
+        wrapped = _wrap_to_width(words, candidate_font, avail_w)
+        lh = fs * _LINE_SPACING
+        if len(wrapped) * lh <= avail_h:
+            return wrapped, candidate_font, lh
+    font = _font(_MIN_FONT)
+    line_height = _MIN_FONT * _LINE_SPACING
+    wrapped = _wrap_to_width(words, font, avail_w)
+    max_lines = max(1, int(avail_h / line_height))
+    return wrapped[:max_lines], font, line_height
+
+
 def render_text_png(
     design_copy: str,
     *,
@@ -83,40 +109,51 @@ def render_text_png(
     height: int = PRINT_HEIGHT,
     margin: int = PRINT_MARGIN,
     garment_color: str = "black",
+    layout: str = DEFAULT_LAYOUT,
 ) -> bytes:
-    """Render ``design_copy`` to transparent-background PNG bytes, print-ready."""
-    fill = _hex_to_rgba(print_color_for_garment(garment_color))
-    words = design_copy.split() or [design_copy]
-    avail_w = width - 2 * margin
-    avail_h = height - 2 * margin
+    """Render ``design_copy`` to transparent-background PNG bytes, print-ready.
 
-    # Largest font whose wrapped lines fit the box on both axes.
-    lines: list[str] = [design_copy]
-    font = _font(_MIN_FONT)
-    line_height = _MIN_FONT * _LINE_SPACING
-    for fs in range(_MAX_FONT, _MIN_FONT - 1, -4):
-        candidate_font = _font(fs)
-        wrapped = _wrap_to_width(words, candidate_font, avail_w)
-        lh = fs * _LINE_SPACING
-        if len(wrapped) * lh <= avail_h:
-            lines, font, line_height = wrapped, candidate_font, lh
-            break
-    else:
-        # Still overflows at the min size: keep only the lines that fit vertically.
-        font = _font(_MIN_FONT)
-        line_height = _MIN_FONT * _LINE_SPACING
-        wrapped = _wrap_to_width(words, font, avail_w)
-        max_lines = max(1, int(avail_h / line_height))
-        lines = wrapped[:max_lines]
+    ``layout`` selects a placement template (see ``LAYOUTS``). An unknown layout
+    falls back to ``centered`` so a bad value never crashes a drop."""
+    if layout not in LAYOUTS:
+        logger.warning("unknown layout %r; falling back to %s", layout, DEFAULT_LAYOUT)
+        layout = DEFAULT_LAYOUT
+
+    fill = _hex_to_rgba(print_color_for_garment(garment_color))
+    spec = layout_spec(layout, width, height, margin)
+    text = design_copy.lower() if spec.lowercase else design_copy
+    words = text.split() or [text]
+
+    lines, font, line_height = _fit_lines(words, spec.width, spec.height, spec.max_font)
 
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     block_h = len(lines) * line_height
-    start_y = (height - block_h) / 2
+
+    left_aligned = spec.align == "left"
+    # left-aligned starts at the region top; the rest vertically-center in the region.
+    start_y = spec.y0 if left_aligned else spec.y0 + (spec.height - block_h) / 2
+    anchor = "lm" if left_aligned else "mm"
+    text_x = spec.x0 if left_aligned else (spec.x0 + spec.x1) / 2
+
     for i, line in enumerate(lines):
         y = start_y + i * line_height + line_height / 2
-        # anchor="mm": center each line horizontally and within its line slot.
-        draw.text((width / 2, y), line, font=font, fill=fill, anchor="mm")
+        draw.text((text_x, y), line, font=font, fill=fill, anchor=anchor)
+
+    if spec.box:
+        # Outline framing the text block, in the same ink so it stays on-garment.
+        # Clamp inside the region so the frame never crosses the print safe-margin.
+        widest = max((font.getlength(ln) for ln in lines), default=0.0)
+        cx = (spec.x0 + spec.x1) / 2
+        pad = max(line_height * 0.45, 24)
+        stroke = max(6, int(font.size / 12))
+        box = (
+            max(spec.x0, cx - widest / 2 - pad),
+            max(spec.y0, start_y - pad),
+            min(spec.x1, cx + widest / 2 + pad),
+            min(spec.y1, start_y + block_h + pad),
+        )
+        draw.rectangle(box, outline=fill, width=stroke)
 
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")  # untagged RGBA PNG is interpreted as sRGB

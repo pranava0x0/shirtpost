@@ -16,6 +16,7 @@ from xml.sax.saxutils import escape as xml_escape
 import requests
 
 from app.config import Settings
+from app.factory.layouts import DEFAULT_LAYOUT, LAYOUTS, layout_spec
 
 logger = logging.getLogger(__name__)
 
@@ -128,26 +129,31 @@ class PrintfulClient:
         *,
         margin: int = 150,
         garment_color: str = "black",  # default variant 4012 is black -> white ink
+        layout: str = DEFAULT_LAYOUT,
     ) -> str:
-        """Render design copy centered *inside* the printable area.
+        """Render design copy *inside* the printable area using ``layout``.
 
-        Picks the largest font size at which the wrapped copy fits the canvas on
-        both axes, so even a max-length (500-char) submission stays on the shirt
-        instead of spilling above/below it. Wrapping is done on the raw text and
+        Picks the largest font size at which the wrapped copy fits the layout's
+        region on both axes, so even a max-length (500-char) submission stays on
+        the shirt instead of spilling out. Wrapping is done on the raw text and
         each line is XML-escaped afterward, so an escaped entity (``&lt;`` …) can
         never be split into invalid markup, and no raw markup can break out.
 
-        The ink color is derived from ``garment_color`` for contrast, so the art
-        never prints white-on-white when the variant is a light garment.
+        The ink color is derived from ``garment_color`` for contrast, and the
+        layout geometry/case is shared with the PNG path (``app.factory.layouts``),
+        so this debuggable SVG source and the printed PNG always agree.
         """
+        if layout not in LAYOUTS:
+            layout = DEFAULT_LAYOUT
         fill = print_color_for_garment(garment_color)
-        words = design_copy.split() or [design_copy]
-        avail_w = width - 2 * margin
-        avail_h = height - 2 * margin
+        spec = layout_spec(layout, width, height, margin)
+        text = design_copy.lower() if spec.lowercase else design_copy
+        words = text.split() or [text]
+        avail_w, avail_h = spec.width, spec.height
 
-        # Largest font (descending) whose wrapped lines fit the box vertically.
+        # Largest font (descending) whose wrapped lines fit the region vertically.
         lines, font_size, line_height = _wrap_words(words, 1), 24, 30.0
-        for fs in range(220, 23, -4):
+        for fs in range(spec.max_font, 23, -4):
             chars_per_line = max(1, int(avail_w / (0.6 * fs)))  # ~0.6em/char, Arial bold
             wrapped = _wrap_words(words, chars_per_line)
             lh = fs * 1.25
@@ -162,13 +168,32 @@ class PrintfulClient:
             lines = _wrap_words(words, chars_per_line)[:max_lines]
 
         total_h = len(lines) * line_height
-        start_y = (height - total_h) / 2 + font_size  # first baseline, vertically centered
+        block_top = spec.y0 + (avail_h - total_h) / 2
+        if spec.align == "left":
+            text_anchor, text_x, start_y = "start", int(spec.x0), spec.y0 + font_size
+        else:
+            text_anchor = "middle"
+            text_x = int((spec.x0 + spec.x1) / 2)
+            start_y = block_top + font_size  # first baseline, vertically centered in region
+
         parts = []
+        if spec.box:
+            # Outline framing the text block, clamped inside the region.
+            widest = max((len(ln) for ln in lines), default=0) * 0.6 * font_size
+            cx = (spec.x0 + spec.x1) / 2
+            pad = max(line_height * 0.45, 24)
+            bx0, by0 = max(spec.x0, cx - widest / 2 - pad), max(spec.y0, block_top - pad)
+            bx1, by1 = min(spec.x1, cx + widest / 2 + pad), min(spec.y1, block_top + total_h + pad)
+            parts.append(
+                f'<rect x="{bx0:.0f}" y="{by0:.0f}" width="{(bx1 - bx0):.0f}" '
+                f'height="{(by1 - by0):.0f}" fill="none" stroke="{fill}" '
+                f'stroke-width="{max(6, font_size // 12)}"/>'
+            )
         for i, line in enumerate(lines):
             safe = xml_escape(line, {'"': "&quot;", "'": "&apos;"})
             y = start_y + i * line_height
             parts.append(
-                f'<text x="{width // 2}" y="{y:.0f}" text-anchor="middle" '
+                f'<text x="{text_x}" y="{y:.0f}" text-anchor="{text_anchor}" '
                 f'font-family="Arial, sans-serif" font-weight="700" '
                 f'font-size="{font_size}" fill="{fill}">{safe}</text>'
             )

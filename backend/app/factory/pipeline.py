@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.factory import storage
 from app.factory.printful import PrintfulClient
-from app.factory.render import render_text_png
+from app.factory.render import DEFAULT_LAYOUT, render_text_png
 from app.factory.xcom import XClient, build_x_intent_url
 from app.models import Drop, DropStatus, Trend, utcnow
 
@@ -43,11 +43,17 @@ class FactoryPipeline:
 
         try:
             # 1. Build the SVG source (debuggable) and rasterize the PNG Printful
-            # will actually fetch — Printful's DTG pipeline rejects SVG.
+            # will actually fetch — Printful's DTG pipeline rejects SVG. Ink is
+            # derived from the ACTUAL garment ordered (the configured variant); the
+            # per-drop layout picks a placement template (Part C variety). Both the
+            # SVG and PNG honor the same garment + layout, so they stay in sync.
             garment = self._settings.printful_garment_color
-            svg = PrintfulClient.build_text_svg(drop.design_copy, garment_color=garment)
+            layout = drop.layout or DEFAULT_LAYOUT
+            svg = PrintfulClient.build_text_svg(
+                drop.design_copy, garment_color=garment, layout=layout
+            )
             self._write_artifact(drop.id, "svg", svg.encode("utf-8"))
-            png = render_text_png(drop.design_copy, garment_color=garment)
+            png = render_text_png(drop.design_copy, garment_color=garment, layout=layout)
             self._write_artifact(drop.id, "png", png)
 
             # Dry-run: complete the loop without any external service. Mark every

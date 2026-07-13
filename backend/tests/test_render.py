@@ -5,7 +5,9 @@ import io
 
 from PIL import Image
 
-from app.factory.render import PRINT_HEIGHT, PRINT_WIDTH, render_text_png
+import pytest
+
+from app.factory.render import LAYOUTS, PRINT_HEIGHT, PRINT_WIDTH, render_text_png
 
 
 def _open(png_bytes: bytes) -> Image.Image:
@@ -66,3 +68,45 @@ def test_injection_text_is_just_pixels_not_markup():
     img = _open(render_text_png("</text><script>alert(1)</script>"))
     assert img.mode == "RGBA"
     assert _has_ink(img)
+
+
+def _corners_transparent(img: Image.Image) -> bool:
+    return (
+        img.getpixel((0, 0))[3] == 0
+        and img.getpixel((PRINT_WIDTH - 1, 0))[3] == 0
+        and img.getpixel((0, PRINT_HEIGHT - 1))[3] == 0
+        and img.getpixel((PRINT_WIDTH - 1, PRINT_HEIGHT - 1))[3] == 0
+    )
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_every_layout_stays_contained_and_draws_ink(layout):
+    # Each template must render on-canvas (corners untouched = inside the print
+    # area) with visible ink and the right size — the core containment invariant.
+    img = _open(render_text_png("crashing out respectfully", layout=layout))
+    assert img.size == (PRINT_WIDTH, PRINT_HEIGHT)
+    assert img.mode == "RGBA"
+    assert _has_ink(img), f"{layout} drew no ink"
+    assert _corners_transparent(img), f"{layout} bled into a corner"
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_every_layout_handles_long_copy_without_bleeding(layout):
+    copy = ("supercalifragilistic expialidocious " * 20)[:500]
+    img = _open(render_text_png(copy, layout=layout))
+    assert img.size == (PRINT_WIDTH, PRINT_HEIGHT)
+    assert _has_ink(img)
+    assert _corners_transparent(img), f"{layout} overflowed on long copy"
+
+
+def test_unknown_layout_falls_back_to_centered_without_crashing():
+    fallback = _open(render_text_png("demure", layout="not-a-layout"))
+    centered = _open(render_text_png("demure", layout="centered"))
+    assert fallback.tobytes() == centered.tobytes()  # identical to the default
+
+
+def test_top_left_and_centered_differ():
+    # Variety is the whole point: the same copy in two layouts must not be identical.
+    a = _open(render_text_png("we are so back", layout="centered")).tobytes()
+    b = _open(render_text_png("we are so back", layout="top_left")).tobytes()
+    assert a != b

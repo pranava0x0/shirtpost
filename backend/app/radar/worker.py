@@ -34,7 +34,7 @@ def run_sweep_once() -> int:
                 )
                 if trend is None:
                     velocity = scoring.compute_velocity(0, item.volume, now, now)
-                    hype = scoring.hype_score(velocity, item.volume)
+                    hype = scoring.hype_for(item.measurement, velocity, item.volume)
                     trend = Trend(
                         term=item.term,
                         term_raw=item.term_raw,
@@ -45,6 +45,9 @@ def run_sweep_once() -> int:
                         prev_volume=0,
                         velocity=velocity,
                         hype_score=hype,
+                        context=item.context,
+                        angles=item.angles,
+                        ip_risk=item.ip_risk,
                         first_seen_at=now,
                         last_seen_at=now,
                     )
@@ -54,7 +57,7 @@ def run_sweep_once() -> int:
                     velocity = scoring.compute_velocity(
                         trend.volume, item.volume, trend.last_seen_at, now
                     )
-                    hype = scoring.hype_score(velocity, item.volume)
+                    hype = scoring.hype_for(item.measurement, velocity, item.volume)
                     trend.prev_volume = trend.volume
                     trend.volume = item.volume
                     trend.velocity = velocity
@@ -63,6 +66,15 @@ def run_sweep_once() -> int:
                     trend.last_seen_at = now
                     if item.source_url:
                         trend.source_url = item.source_url
+                    # Refresh discovery enrichment when the source re-supplies it;
+                    # never clobber existing values with None (a non-discovery
+                    # re-sight of the same term must not wipe context/angles).
+                    if item.context is not None:
+                        trend.context = item.context
+                    if item.angles is not None:
+                        trend.angles = item.angles
+                    if item.ip_risk is not None:
+                        trend.ip_risk = item.ip_risk
                 # Append-only snapshot for the velocity curve. Add by trend_id
                 # rather than trend.observations.append() so we never load the
                 # (unbounded, ever-growing) prior history on each sweep.

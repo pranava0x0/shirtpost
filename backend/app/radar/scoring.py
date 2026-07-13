@@ -22,6 +22,13 @@ from datetime import datetime
 # Max additional multiple a fast riser can add on top of its volume base.
 HYPE_VELOCITY_BOOST_CAP = 2.0
 
+# Measurements whose `volume` is already a judged ranking (0..100), not a raw
+# attention count. For these the Hype Score IS the score — passing it through the
+# velocity boost would let a freshly-seen 60 (first-sight ~2x boost) outrank a
+# day-old 90 inside its own lane. Velocity is still recorded on the observation
+# (so the sparkline is honest), it just never boosts hype here.
+JUDGED_MEASUREMENTS = frozenset({"shirt_score"})
+
 
 def compute_velocity(
     prev_volume: int, current_volume: int, prev_seen: datetime, now: datetime
@@ -41,3 +48,12 @@ def hype_score(velocity: float, volume: int) -> float:
         return 0.0
     boost = min(max(velocity / volume, 0.0), HYPE_VELOCITY_BOOST_CAP)
     return round(volume * (1.0 + boost), 4)
+
+
+def hype_for(measurement: str, velocity: float, volume: int) -> float:
+    """Hype Score for a source's measurement. A judged measurement (see
+    JUDGED_MEASUREMENTS) passes its score straight through unboosted; every other
+    measurement gets the volume-base + capped-velocity-boost model above."""
+    if measurement in JUDGED_MEASUREMENTS:
+        return float(max(volume, 0))
+    return hype_score(velocity, volume)
