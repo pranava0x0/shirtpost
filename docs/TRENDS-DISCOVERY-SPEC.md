@@ -24,7 +24,8 @@ The loop works end-to-end (radar → queue → quips → factory → post), but 
    `frontend/lib/quips.ts` feeds the same lines to the quip prompt as the house
    voice, so generated copy *inherits* the staleness.
 3. **No shirt-worthiness or IP dimension in scoring.** `hype_score` ranks raw
-   attention (volume × capped velocity). Nothing scores phrase-ness, durability,
+   attention (a volume base with a capped velocity boost — see `scoring.py`).
+   Nothing scores phrase-ness, durability,
    or identity value — and nothing flags IP risk. Wikipedia's top slots are mostly
    proper nouns (celebrities, franchises) that are legally unprintable
    (right-of-publicity / trademark), so the queue fills with trends we must not
