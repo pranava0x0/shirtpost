@@ -10,10 +10,15 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+# Judged shirt_score is defined on a 0..100 scale (A3 rubric). Enforced at ingest.
+SHIRT_SCORE_MIN = 0
+SHIRT_SCORE_MAX = 100
 
 import feedparser
 from bs4 import BeautifulSoup
@@ -201,13 +206,21 @@ def _parse_discovered_line(raw: str) -> dict | None:
         return None
     score = obj.get("shirt_score")
     # bool is a subclass of int — reject it explicitly so `true`/`false` can't
-    # sneak in as a score of 1/0. Also require a non-negative score: a judged-out
-    # (negative) term is not a candidate, and a negative volume is nonsense.
+    # sneak in as a score of 1/0. Reject non-finite (Python's json accepts
+    # NaN/Infinity) and anything outside the judged 0..100 range: since judged
+    # scores bypass Hype (volume == shirt_score), an out-of-range value would
+    # corrupt the whole discovered lane's within-source scale.
     if isinstance(score, bool) or not isinstance(score, (int, float)):
         logger.warning("discovered: skipping term=%r with non-numeric shirt_score %r", term, score)
         return None
-    if score < 0:
-        logger.warning("discovered: skipping term=%r with negative shirt_score %r", term, score)
+    if not math.isfinite(score):
+        logger.warning("discovered: skipping term=%r with non-finite shirt_score %r", term, score)
+        return None
+    if not SHIRT_SCORE_MIN <= score <= SHIRT_SCORE_MAX:
+        logger.warning(
+            "discovered: skipping term=%r with out-of-range shirt_score %r (want %d..%d)",
+            term, score, SHIRT_SCORE_MIN, SHIRT_SCORE_MAX,
+        )
         return None
     return {
         "term": term,

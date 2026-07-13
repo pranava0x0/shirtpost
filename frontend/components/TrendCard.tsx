@@ -62,6 +62,10 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
         setDrop(fresh);
         if (!isInFlight(fresh.status)) {
           clearInterval(timer);
+          // Only copy that actually SHIPPED becomes house-voice — record on
+          // publish, not on submit, so a Factory failure doesn't poison the
+          // hall of fame. Deduped server-side, so re-observing is a no-op.
+          if (fresh.status === "published") api.recordHallOfFame(fresh.design_copy);
           router.refresh();
         }
       } catch {
@@ -84,9 +88,9 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
     startTransition(async () => {
       try {
         const created = await api.submitDesign(trend.id, value, { layout });
-        // The line the operator actually shipped becomes house-voice for future
-        // generations (best-effort, never blocks the submit).
-        api.recordHallOfFame(value);
+        // Hall-of-fame recording happens when the drop reaches "published" (see the
+        // poll effect above), not here — a submitted-but-failed drop must not seed
+        // the house voice.
         setCopy("");
         setDrop(created);
       } catch (e) {

@@ -154,6 +154,12 @@ Rules (all existing CLAUDE.md data rules apply):
   days); the file itself is never trimmed.
 - The routine only ever touches `data/trends/*.jsonl` — never code. Stated as a
   hard rule in its prompt (blast-radius guard).
+- **Every sweep appends one run-report line to `data/trends/_sweeps.jsonl`**
+  (per-source `fetched/considered/kept/killed`, kill reasons, failures, `ran_at`).
+  This is what guarantees a diff — so even a zero-candidate sweep can open a PR
+  (a no-diff branch can't). The `discovered` adapter reads only
+  `DISCOVERED_TRENDS_PATH` (`discovered.jsonl`), so the `_`-prefixed sweep log is
+  a pure audit trail and never ingested as trend data.
 
 ### A5. Radar integration (backend)
 
@@ -198,13 +204,16 @@ trending TODAY that someone would wear on a t-shirt. Judge each candidate on the
 A3 rubric (wearability, funny, durability, phrase-ness; kill on family-safety or
 IP risk — no real people, brands, franchises, or lyrics). Dedupe against
 data/trends/discovered.jsonl (skip keys seen in the last 14 days). Append
-qualifying candidates (shirt_score >= 55) as A4-schema JSONL lines. You may ONLY
-modify data/trends/*.jsonl. Respect fetch hygiene: >=1.5s between requests to a
-host, skip a source that errors and note it. Open or update a PR titled
+qualifying candidates (shirt_score 55..100) as A4-schema JSONL lines. ALWAYS
+append one run-report line to data/trends/_sweeps.jsonl (per-source
+fetched/considered/kept/killed, kill reasons, failures, ran_at) — this guarantees
+a diff, so an empty sweep can still open a PR. You may ONLY modify
+data/trends/*.jsonl. Respect fetch hygiene: >=1.5s between requests to a host,
+skip a source that errors and note it. Open or update a PR titled
 "radar: <YYYY-MM-DD> discovery sweep" whose body reports per-source
 fetched/considered/kept/killed counts, kill reasons, and any source that failed
 (a source that returned nothing is reported as a failure, not silence). If NO
-candidate qualifies, still open the PR with the empty-sweep report.
+candidate qualifies, still open the PR — the _sweeps.jsonl line is the diff.
 ```
 
 Ops notes: the PR body is the run report (per-source counts — a silently dead

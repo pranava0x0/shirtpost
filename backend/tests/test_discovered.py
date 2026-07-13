@@ -111,6 +111,25 @@ def test_negative_shirt_score_is_rejected():
     assert sources.parse_discovered(body, window_days=14, today=_TODAY) == []
 
 
+def test_out_of_range_shirt_score_is_rejected():
+    # Judged scores bypass Hype (volume == shirt_score); a 500 would blow out the
+    # discovered lane's within-source scale, so it's dropped, not clamped.
+    body = _line("too big", _TODAY, 500)
+    assert sources.parse_discovered(body, window_days=14, today=_TODAY) == []
+
+
+def test_non_finite_shirt_score_is_rejected():
+    # Python's json accepts NaN/Infinity — they must not pass the numeric check.
+    for raw in ("NaN", "Infinity", "-Infinity"):
+        body = '{"term": "wild", "day": "%s", "shirt_score": %s}' % (_TODAY.isoformat(), raw)
+        assert sources.parse_discovered(body, window_days=14, today=_TODAY) == [], raw
+
+
+def test_max_score_100_is_kept():
+    rows = sources.parse_discovered(_line("perfect", _TODAY, 100), window_days=14, today=_TODAY)
+    assert len(rows) == 1 and rows[0].volume == 100
+
+
 def test_zero_shirt_score_is_kept_as_zero_volume():
     # 0 is a valid (if unexciting) score — kept, not confused with "invalid".
     rows = sources.parse_discovered(_line("meh", _TODAY, 0), window_days=14, today=_TODAY)

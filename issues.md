@@ -77,6 +77,26 @@ Part B copy-gen + Part C merch). All fixed on the v2 branch; tests: 136 backend 
   swallow "duplicate column" rather than reflect first — SQLite's per-connection
   schema cache made reflection disagree with the ALTER across pooled connections.
 
+### Codex bot review (round 2) — additional fixes
+
+- **Global top-N starved the discovered lane** · `api/routes.py` `list_trends` ·
+  **code bug** · Fixed. `/trends?limit=N` ordered by global `hype_score` and
+  trimmed, so the discovered lane's 0–100 scores sank below the attention sources'
+  raw volumes and could vanish. Now returns the top-N *per source* (partitioned
+  `row_number()`). **Regression test:** `test_low_hype_source_not_starved_by_global_limit`.
+- **`shirt_score` validation missed NaN/Infinity/out-of-range** · `radar/sources.py`
+  · **code bug** · Fixed. Judged scores bypass Hype, so a `500` or `NaN`
+  (`json.loads` accepts non-finite) would corrupt the lane scale. Now rejects
+  non-finite and anything outside 0–100. **Regression tests:**
+  `test_out_of_range_shirt_score_is_rejected`, `test_non_finite_shirt_score_is_rejected`.
+- **Hall of fame recorded on submit, not publish** · `TrendCard.tsx` · **code bug**
+  · Fixed. A submitted-but-failed drop seeded the house voice; recording moved to
+  the poll effect's `published` transition (deduped server-side).
+- **Empty-sweep PR had no diff to open** · `docs/TRENDS-DISCOVERY-SPEC.md` (A4/A6)
+  · **spec bug** · Fixed. The routine now always appends a run-report line to
+  `data/trends/_sweeps.jsonl` (not ingested by the adapter), so a zero-candidate
+  sweep still produces a diff and a PR.
+
 ### Noted, not fixed (low severity, single-operator local tool)
 
 - Hall-of-fame append is read-modify-write with no lock (concurrent submits can

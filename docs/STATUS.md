@@ -40,9 +40,9 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
 ## Verified (all green, 2026-07-13, post-CR)
 
-- Backend: `pytest` = **136 passed** on CPython 3.12 (was 98); includes the new
-  `discovered` adapter, hype-bypass, per-layout render + SVG-parity tests, and the
-  additive-migration upgrade-path regression suite.
+- Backend: `pytest` = **140 passed** on CPython 3.12 (was 98); includes the new
+  `discovered` adapter, hype-bypass, per-layout render + SVG-parity tests, the
+  additive-migration upgrade-path regression suite, and per-source lane coverage.
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes,
   `npm test` (**vitest, 31 passed** across `quips` + `hallOfFame`) covers the quip
   parse/filter/cliché/IP paths and the hall-of-fame append/dedupe/no-cap paths.
@@ -52,14 +52,15 @@ human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
 ### Critical CR pass (2026-07-13)
 
-An 8-angle multi-agent review of the v2 diff found ~13 issues; the confirmed ones
-are fixed (full audit in [issues.md](../issues.md)). Headline: the per-drop
-**garment picker printed invisibly** (it flipped the ink but not the ordered
-Printful variant) — removed, pending a real color→variant map (backlog); the
-debug **SVG now shares layout geometry with the PNG** (`factory/layouts.py`);
-empty quip batches no longer cache; the hall of fame stores every line (no
-count-cap); and discovered-score validation + the discovery window off-by-one are
-tightened.
+An 8-angle multi-agent review of the v2 diff found ~13 issues; plus a Codex-bot
+review round. The confirmed ones are fixed (full audit in [issues.md](../issues.md)).
+Headline: the per-drop **garment picker printed invisibly** (it flipped the ink
+but not the ordered Printful variant) — removed, pending a real color→variant map
+(backlog); the debug **SVG now shares layout geometry with the PNG**
+(`factory/layouts.py`); the laned **`/trends` fetch is now top-N per source** (a
+global limit starved the discovered lane); empty quip batches no longer cache; the
+hall of fame stores every line (no count-cap) and records on *publish* not submit;
+and discovered-score validation (bool/NaN/range) + the window off-by-one are tightened.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
   hype sparklines and within-source meters; `submit` → **fails loud** with the
   exact missing-config reason → **Retry drop** re-runs the *same* drop (no
