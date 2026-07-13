@@ -163,14 +163,25 @@ Rules (all existing CLAUDE.md data rules apply):
   keeping max `shirt_score`, emit `RawTrend(volume=shirt_score,
   measurement="shirt_score")`. Lanes already prevent cross-source comparison, so
   a 0–100 score is an honest volume for its own lane.
+- **Hype Score bypass for judged measurements.** `shirt_score` is already a
+  *ranking*, not a raw volume — running it through the worker's velocity boost
+  would let a fresh 60 (first-sight ~2× boost) outrank a day-old 90 inside its
+  own lane. For `measurement="shirt_score"` the worker sets
+  `hype_score = volume` directly; velocity is still recorded on the observation
+  (sparkline) but never boosts. Regression test: a re-sweep leaves a discovered
+  trend's hype unchanged unless its score changed.
 - Malformed line → log + skip (never crash the sweep); empty/missing file → log
   a distinct "no discovery data" warning (empty ≠ broken).
-- **New nullable `Trend.context` column** (+ migration): carried from the JSONL,
-  shown on the TrendCard, and passed to `/api/quips` (Part B). Nullable so every
-  existing row reads as before.
+- **New nullable `Trend` columns `context` (str), `angles` (JSON), `ip_risk`
+  (bool)** (+ migration): carried from the JSONL through the whole contract —
+  `RawTrend` → model → `TrendOut` → the frontend `Trend` type — shown on the
+  TrendCard and passed to `/api/quips`. Part B's grounding (context + angles)
+  and IP guard (ip_risk) are dead weight unless all three survive ingest.
+  Nullable so every existing row reads as before.
 - Family keyword gate still applies after the adapter (defense in depth).
 - Tests: fixture JSONL (happy path, malformed line, empty file, 15-day-old line
-  excluded, dedupe-keeps-max-score), plus one seed per `measurement` enum value.
+  excluded, dedupe-keeps-max-score, hype == shirt_score with no boost), plus one
+  seed per `measurement` enum value.
 
 ### A6. The routine itself
 
