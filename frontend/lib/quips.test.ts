@@ -77,6 +77,21 @@ describe("cleanAndFilter", () => {
     expect(dropped).toBe(1);
   });
 
+  it("drops partial-name IP leaks, not just the exact full term", () => {
+    // "swiftie" / "taylor's version" don't contain the full "taylor swift", but
+    // each contains a significant word of it — the belt must still catch them.
+    const raw = ["certified swiftie", "taylor's version of monday", "unbothered moody"];
+    const { kept } = cleanAndFilter(raw, { ...OPTS, term: "  Taylor Swift  ", ipRisk: true });
+    expect(kept).toEqual(["unbothered moody"]);
+  });
+
+  it("counts a repeated cliché only once (dropped is a quality signal, not a tally)", () => {
+    const raw = ["but first coffee", "but first coffee", "genuinely funny"];
+    const { kept, dropped } = cleanAndFilter(raw, OPTS);
+    expect(kept).toEqual(["genuinely funny"]);
+    expect(dropped).toBe(1); // the duplicate cliché is deduped, not double-counted
+  });
+
   it("does NOT drop the term when ipRisk is unset", () => {
     const { kept } = cleanAndFilter(["crashing out again"], {
       ...OPTS,

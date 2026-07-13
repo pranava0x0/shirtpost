@@ -179,7 +179,6 @@ def submit_design(
         trend_id=trend.id,
         design_copy=body.design_copy,
         layout=body.layout,
-        garment_color=body.garment_color,
         status=DropStatus.PENDING,
     )
     session.add(drop)

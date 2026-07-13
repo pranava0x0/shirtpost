@@ -32,6 +32,7 @@
 
 - [printful.py](backend/app/factory/printful.py): Printful client — builds the SVG source, generates mockups, syncs the store catalog; XML-escaped payloads and garment-contrast ink selection.
 - [render.py](backend/app/factory/render.py): Rasterizes the design copy to a transparent print-ready PNG with Pillow (Printful rejects SVG); bundled scalable font, no system libs; 4 layout templates (centered/left-chest/oversized/boxed).
+- [layouts.py](backend/app/factory/layouts.py): Shared layout geometry (region/scale/case/box per template) used by both renderers, so the debug SVG source and the printed PNG always agree.
 - [storage.py](backend/app/factory/storage.py): Hosts the PNG where Printful can fetch it — `local` (served by this backend) or `github_pages` (push + poll until live); returns the public URL.
 - [xcom.py](backend/app/factory/xcom.py): X.com — prefilled Web Intent URL (free default) and the v2 media-upload + tweet client for auto-post (`api`) mode.
 - [pipeline.py](backend/app/factory/pipeline.py): Idempotent Factory pipeline — builds SVG + PNG, Printful mockup/sync, then a mode-aware broadcast (intent/api); each step commits as it lands and is skipped on retry, so a posted tweet is never sent twice.

@@ -200,8 +200,14 @@ def _parse_discovered_line(raw: str) -> dict | None:
         logger.warning("discovered: skipping line with empty term")
         return None
     score = obj.get("shirt_score")
-    if not isinstance(score, (int, float)):
-        logger.warning("discovered: skipping term=%r with non-numeric shirt_score", term)
+    # bool is a subclass of int — reject it explicitly so `true`/`false` can't
+    # sneak in as a score of 1/0. Also require a non-negative score: a judged-out
+    # (negative) term is not a candidate, and a negative volume is nonsense.
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        logger.warning("discovered: skipping term=%r with non-numeric shirt_score %r", term, score)
+        return None
+    if score < 0:
+        logger.warning("discovered: skipping term=%r with negative shirt_score %r", term, score)
         return None
     return {
         "term": term,
@@ -235,6 +241,9 @@ def parse_discovered(body: str, *, window_days: int, today: date) -> list[RawTre
     volume for its own lane, since lanes never compare across sources. The worker
     bypasses the velocity boost for this measurement (a judged score is already a
     ranking; see worker.run_sweep_once)."""
+    # Exclusive lower bound: keep `today` and the prior window_days-1 days =
+    # exactly window_days calendar days (e.g. window_days=14 keeps a 14-day span,
+    # not 15). Future days are guarded too.
     cutoff = today - timedelta(days=window_days)
     best: dict[str, dict] = {}
     for line in body.splitlines():
@@ -249,7 +258,7 @@ def parse_discovered(body: str, *, window_days: int, today: date) -> list[RawTre
         except ValueError:
             logger.warning("discovered: term=%r has unparseable day=%r — skipping", rec["term"], rec["day"])
             continue
-        if day < cutoff or day > today:
+        if day <= cutoff or day > today:
             continue  # outside the window (future days guarded too)
         prev = best.get(rec["key"])
         if prev is None or rec["shirt_score"] > prev["shirt_score"]:

@@ -20,26 +20,24 @@ from functools import lru_cache
 
 from PIL import Image, ImageDraw, ImageFont
 
+from app.factory.layouts import DEFAULT_LAYOUT, LAYOUTS, layout_spec
 from app.factory.printful import print_color_for_garment
 
 logger = logging.getLogger(__name__)
 
 # Print area in px. 1800x2400 over a ~12x16in DTG area ≈ 150 DPI, and matches the
-# position payload the mockup request sends. Kept in sync with build_text_svg.
+# position payload the mockup request sends. The SVG source (build_text_svg) shares
+# the same layout geometry via app.factory.layouts, so the two stay in sync.
 PRINT_WIDTH = 1800
 PRINT_HEIGHT = 2400
 PRINT_MARGIN = 150
 
-_MAX_FONT = 220
 _MIN_FONT = 24
 _LINE_SPACING = 1.25
 
 # Layout templates so two drops never look identical (TRENDS-DISCOVERY-SPEC Part
-# C). Each keeps the print inside the area with a transparent background — only
-# the placement, case, scale, and decoration change. "centered" is the historical
-# default; the operator picks per drop (the dashboard rotates by default).
-LAYOUTS = ("centered", "top_left", "oversized", "boxed")
-DEFAULT_LAYOUT = "centered"
+# C); geometry is defined once in app.factory.layouts and shared with the SVG path.
+# "centered" is the historical default; the operator picks per drop (rotated by default).
 
 
 @lru_cache(maxsize=128)
@@ -104,24 +102,6 @@ def _fit_lines(
     return wrapped[:max_lines], font, line_height
 
 
-def _region(layout: str, width: int, height: int, margin: int) -> tuple[float, float, float, float, int]:
-    """The (x0, y0, x1, y1, max_font) the text must stay within for a layout.
-    Every region is a sub-box of the printable area, so text never leaves it."""
-    if layout == "top_left":
-        # Small left-chest hit in the upper-left, roughly a fifth of the front.
-        return (margin, margin, width * 0.6, height * 0.42, 130)
-    if layout == "oversized":
-        # Fill the width aggressively (half the margin) for a big, loud print.
-        m = margin // 2
-        return (m, m, width - m, height - m, 300)
-    if layout == "boxed":
-        # Inset a little so the outline box has room inside the print area.
-        inset = margin + 40
-        return (inset, inset, width - inset, height - inset, 190)
-    # centered (default) — the historical full-box centered stack.
-    return (margin, margin, width - margin, height - margin, _MAX_FONT)
-
-
 def render_text_png(
     design_copy: str,
     *,
@@ -140,39 +120,40 @@ def render_text_png(
         layout = DEFAULT_LAYOUT
 
     fill = _hex_to_rgba(print_color_for_garment(garment_color))
-    text = design_copy.lower() if layout == "oversized" else design_copy
+    spec = layout_spec(layout, width, height, margin)
+    text = design_copy.lower() if spec.lowercase else design_copy
     words = text.split() or [text]
 
-    x0, y0, x1, y1, max_font = _region(layout, width, height, margin)
-    region_w, region_h = x1 - x0, y1 - y0
-    lines, font, line_height = _fit_lines(words, region_w, region_h, max_font)
+    lines, font, line_height = _fit_lines(words, spec.width, spec.height, spec.max_font)
 
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     block_h = len(lines) * line_height
 
-    left_aligned = layout == "top_left"
-    # top_left starts at the region top; the rest vertically-center in the region.
-    start_y = y0 if left_aligned else y0 + (region_h - block_h) / 2
+    left_aligned = spec.align == "left"
+    # left-aligned starts at the region top; the rest vertically-center in the region.
+    start_y = spec.y0 if left_aligned else spec.y0 + (spec.height - block_h) / 2
     anchor = "lm" if left_aligned else "mm"
-    text_x = x0 if left_aligned else (x0 + x1) / 2
+    text_x = spec.x0 if left_aligned else (spec.x0 + spec.x1) / 2
 
     for i, line in enumerate(lines):
         y = start_y + i * line_height + line_height / 2
         draw.text((text_x, y), line, font=font, fill=fill, anchor=anchor)
 
-    if layout == "boxed":
+    if spec.box:
         # Outline framing the text block, in the same ink so it stays on-garment.
+        # Clamp inside the region so the frame never crosses the print safe-margin.
         widest = max((font.getlength(ln) for ln in lines), default=0.0)
-        cx = (x0 + x1) / 2
+        cx = (spec.x0 + spec.x1) / 2
         pad = max(line_height * 0.45, 24)
+        stroke = max(6, int(font.size / 12))
         box = (
-            cx - widest / 2 - pad,
-            start_y - pad,
-            cx + widest / 2 + pad,
-            start_y + block_h + pad,
+            max(spec.x0, cx - widest / 2 - pad),
+            max(spec.y0, start_y - pad),
+            min(spec.x1, cx + widest / 2 + pad),
+            min(spec.y1, start_y + block_h + pad),
         )
-        draw.rectangle(box, outline=fill, width=max(6, int(font.size / 12)))
+        draw.rectangle(box, outline=fill, width=stroke)
 
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")  # untagged RGBA PNG is interpreted as sRGB

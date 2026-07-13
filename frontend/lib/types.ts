@@ -40,9 +40,8 @@ export type Drop = {
   id: number;
   trend_id: number;
   design_copy: string;
-  // Merch variety: render template + garment override (null => defaults).
+  // Merch variety: render template (null => centered).
   layout: string | null;
-  garment_color: string | null;
   status: DropStatus;
   error: string | null;
   printful_mockup_url: string | null;

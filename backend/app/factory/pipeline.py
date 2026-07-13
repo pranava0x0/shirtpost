@@ -43,11 +43,15 @@ class FactoryPipeline:
 
         try:
             # 1. Build the SVG source (debuggable) and rasterize the PNG Printful
-            # will actually fetch — Printful's DTG pipeline rejects SVG. Per-drop
-            # garment/layout override the global default when set (Part C variety).
-            garment = drop.garment_color or self._settings.printful_garment_color
+            # will actually fetch — Printful's DTG pipeline rejects SVG. Ink is
+            # derived from the ACTUAL garment ordered (the configured variant); the
+            # per-drop layout picks a placement template (Part C variety). Both the
+            # SVG and PNG honor the same garment + layout, so they stay in sync.
+            garment = self._settings.printful_garment_color
             layout = drop.layout or DEFAULT_LAYOUT
-            svg = PrintfulClient.build_text_svg(drop.design_copy, garment_color=garment)
+            svg = PrintfulClient.build_text_svg(
+                drop.design_copy, garment_color=garment, layout=layout
+            )
             self._write_artifact(drop.id, "svg", svg.encode("utf-8"))
             png = render_text_png(drop.design_copy, garment_color=garment, layout=layout)
             self._write_artifact(drop.id, "png", png)

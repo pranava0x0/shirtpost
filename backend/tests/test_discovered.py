@@ -89,6 +89,34 @@ def test_future_day_is_excluded():
     assert sources.parse_discovered(body, window_days=14, today=_TODAY) == []
 
 
+def test_window_is_exactly_window_days_not_one_more():
+    # window_days=14 keeps today and the prior 13 days (14 calendar days). The day
+    # exactly window_days ago is the exclusive lower bound -> excluded.
+    edge_out = _line("day-14", _TODAY - timedelta(days=14), 90)
+    edge_in = _line("day-13", _TODAY - timedelta(days=13), 60)
+    rows = sources.parse_discovered("\n".join([edge_out, edge_in]), window_days=14, today=_TODAY)
+    terms = [r.term for r in rows]
+    assert "day-13" in terms
+    assert "day-14" not in terms  # true 14-day window, not 15
+
+
+def test_bool_shirt_score_is_rejected():
+    # bool is an int subclass; a JSON `true` must NOT slip in as score 1.
+    body = '{"term": "boolish", "day": "%s", "shirt_score": true}' % _TODAY.isoformat()
+    assert sources.parse_discovered(body, window_days=14, today=_TODAY) == []
+
+
+def test_negative_shirt_score_is_rejected():
+    body = _line("judged out", _TODAY, -5)
+    assert sources.parse_discovered(body, window_days=14, today=_TODAY) == []
+
+
+def test_zero_shirt_score_is_kept_as_zero_volume():
+    # 0 is a valid (if unexciting) score — kept, not confused with "invalid".
+    rows = sources.parse_discovered(_line("meh", _TODAY, 0), window_days=14, today=_TODAY)
+    assert len(rows) == 1 and rows[0].volume == 0
+
+
 def test_dedupe_keeps_max_score_for_a_key():
     body = "\n".join(
         [

@@ -130,11 +130,11 @@ class Drop(Base):
     design_copy: Mapped[str] = mapped_column(Text)  # operator-authored, from their own LLM
 
     # Merch variety (TRENDS-DISCOVERY-SPEC Part C). layout picks a render template
-    # (see factory/render.LAYOUTS); garment_color overrides the global default per
-    # drop (drives ink contrast). Nullable so pre-existing drops read as before;
-    # the pipeline falls back to "centered" / the config default when null.
+    # (see factory/render.LAYOUTS). Nullable so pre-existing drops read as before;
+    # the pipeline falls back to "centered" when null. (Per-drop garment color is
+    # deferred: it must also select the ordered Printful variant, not just the ink
+    # — see backlog "garment variety needs a Printful color->variant map".)
     layout: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    garment_color: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     # Store the enum *value* ("pending") not the name, so the partial-index
     # predicate above matches and the DB/API agree on the string.

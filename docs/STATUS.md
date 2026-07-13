@@ -38,15 +38,28 @@ rasterization** (Printful rejects SVG), and **free X Web-Intent broadcast** (X h
 no free API tier). Delivered as a PR against `main`. Remaining plan work is
 human-gated or waits on its trigger — see [PLAN.md](PLAN.md) § Progress.
 
-## Verified (all green, 2026-07-13)
+## Verified (all green, 2026-07-13, post-CR)
 
-- Backend: `pytest` = **119 passed** on CPython 3.12 (was 98); includes the new
-  `discovered` adapter, hype-bypass, and per-layout render tests.
+- Backend: `pytest` = **136 passed** on CPython 3.12 (was 98); includes the new
+  `discovered` adapter, hype-bypass, per-layout render + SVG-parity tests, and the
+  additive-migration upgrade-path regression suite.
 - Frontend: `tsc --noEmit` clean, `next lint` clean, `next build` passes,
-  `npm test` (**vitest, 21 passed**) covers the quip parse/filter/cliché/IP paths.
+  `npm test` (**vitest, 31 passed** across `quips` + `hallOfFame`) covers the quip
+  parse/filter/cliché/IP paths and the hall-of-fame append/dedupe/no-cap paths.
 - E2E in the browser (dry-run backend): the **Discovered (judged phrases)** lane
   renders with `hype = shirt_score`, context blurbs, and the ⚠ IP-risk badge; the
-  layout + garment dropdowns render and their defaults rotate per card.
+  layout dropdown renders and its default rotates per card.
+
+### Critical CR pass (2026-07-13)
+
+An 8-angle multi-agent review of the v2 diff found ~13 issues; the confirmed ones
+are fixed (full audit in [issues.md](../issues.md)). Headline: the per-drop
+**garment picker printed invisibly** (it flipped the ink but not the ordered
+Printful variant) — removed, pending a real color→variant map (backlog); the
+debug **SVG now shares layout geometry with the PNG** (`factory/layouts.py`);
+empty quip batches no longer cache; the hall of fame stores every line (no
+count-cap); and discovered-score validation + the discovery window off-by-one are
+tightened.
 - E2E in the browser (dry-run + real-mode): per-source lanes render with inline
   hype sparklines and within-source meters; `submit` → **fails loud** with the
   exact missing-config reason → **Retry drop** re-runs the *same* drop (no

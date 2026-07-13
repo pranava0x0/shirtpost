@@ -6,6 +6,7 @@ import logging
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -21,7 +22,6 @@ _ADDITIVE_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("trends", "angles", "JSON"),
     ("trends", "ip_risk", "BOOLEAN"),
     ("drops", "layout", "VARCHAR(32)"),
-    ("drops", "garment_color", "VARCHAR(64)"),
 )
 
 
@@ -53,18 +53,26 @@ def init_db() -> None:
 def _add_missing_columns() -> None:
     """Lightweight forward-only migration: ADD COLUMN for any `_ADDITIVE_COLUMNS`
     entry absent from an existing table. A fresh DB already has them from
-    create_all(), so this is a no-op there; on an upgraded DB it backfills NULLs."""
-    inspector = inspect(engine)
-    existing_tables = set(inspector.get_table_names())
-    with engine.begin() as conn:
-        for table, column, col_type in _ADDITIVE_COLUMNS:
-            if table not in existing_tables:
-                continue  # create_all handles a table it fully owns
-            cols = {c["name"] for c in inspector.get_columns(table)}
-            if column in cols:
-                continue
-            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+    create_all(), so this is a no-op there; on an upgraded DB it backfills NULLs.
+
+    We attempt each ALTER and treat "duplicate column" as already-present rather
+    than reflecting first: SQLite caches schema per pooled connection, so a
+    reflection on one connection can disagree with the ALTER on another (it bites
+    the test suite, which churns DROP/CREATE). Trusting the ALTER + swallowing the
+    duplicate is fully idempotent and immune to that staleness. Each ALTER runs in
+    its own transaction so a caught duplicate can't poison the others."""
+    existing_tables = set(inspect(engine).get_table_names())
+    for table, column, col_type in _ADDITIVE_COLUMNS:
+        if table not in existing_tables:
+            continue  # create_all handles a table it fully owns
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
             logger.info("migrated: added %s.%s (%s)", table, column, col_type)
+        except OperationalError as exc:
+            if "duplicate column" in str(exc).lower():
+                continue  # already present — idempotent
+            raise
 
 
 def get_session() -> Iterator[Session]:

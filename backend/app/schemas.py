@@ -61,7 +61,6 @@ class DropOut(BaseModel):
     trend_id: int
     design_copy: str
     layout: str | None
-    garment_color: str | None
     status: DropStatus
     error: str | None
     printful_mockup_url: str | None
@@ -79,10 +78,8 @@ class DesignSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     design_copy: str = Field(min_length=1, max_length=500)
-    # Merch variety (Part C). Both optional: layout defaults to "centered", and a
-    # null garment_color falls back to the config default at render time.
+    # Merch variety (Part C). Optional: layout defaults to "centered" at render time.
     layout: str | None = None
-    garment_color: str | None = Field(default=None, max_length=64)
 
     @field_validator("layout")
     @classmethod

@@ -71,17 +71,12 @@ export const api = {
       cache: "no-store",
     }).catch(() => {});
   },
-  submitDesign: (
-    trendId: number,
-    designCopy: string,
-    opts?: { layout?: string; garmentColor?: string },
-  ) =>
+  submitDesign: (trendId: number, designCopy: string, opts?: { layout?: string }) =>
     http<Drop>(`/trends/${trendId}/submit`, {
       method: "POST",
       body: JSON.stringify({
         design_copy: designCopy,
         ...(opts?.layout ? { layout: opts.layout } : {}),
-        ...(opts?.garmentColor ? { garment_color: opts.garmentColor } : {}),
       }),
     }),
   retryDrop: (dropId: number) =>

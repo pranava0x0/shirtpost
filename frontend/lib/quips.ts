@@ -214,7 +214,14 @@ export function cleanAndFilter(
 ): FilterResult {
   const seen = new Set<string>();
   const kept: string[] = [];
-  const ipNeedle = opts.ipRisk && opts.term ? opts.term.toLowerCase() : null;
+  // IP belt: drop a line containing the whole term OR any significant word of it,
+  // so "Taylor Swift" also catches "swiftie"/"taylor's version" (the prompt is the
+  // primary guard; this is the backstop). Trimmed so surrounding whitespace can't
+  // defeat the match. Short (<4-char) tokens are skipped to avoid false positives.
+  const term = opts.ipRisk && opts.term ? opts.term.trim().toLowerCase() : "";
+  const ipNeedles = term
+    ? [term, ...term.split(/\s+/).filter((t) => t.length >= 4)]
+    : [];
   let eraUsed = false;
   let dropped = 0;
   for (const raw of quips) {
@@ -223,6 +230,9 @@ export function cleanAndFilter(
     if (!line || line.length > opts.maxChars) continue; // junk, not a "quality" drop
     const key = line.toLowerCase();
     if (seen.has(key)) continue; // duplicate, not a quality drop
+    // Record the decision now so a repeated cliché/unsafe line is only *counted*
+    // once (dropped is the auditable quality signal, not a raw occurrence count).
+    seen.add(key);
     if (!isFamilySafe(line, opts.blocklist)) {
       dropped++;
       continue;
@@ -231,7 +241,7 @@ export function cleanAndFilter(
       dropped++;
       continue;
     }
-    if (ipNeedle && key.includes(ipNeedle)) {
+    if (ipNeedles.some((needle) => key.includes(needle))) {
       dropped++;
       continue;
     }
@@ -242,7 +252,6 @@ export function cleanAndFilter(
       }
       eraUsed = true;
     }
-    seen.add(key);
     kept.push(line);
     if (kept.length >= opts.count) break;
   }

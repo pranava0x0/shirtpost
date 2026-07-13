@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Sparkline } from "@/components/Sparkline";
 import { api } from "@/lib/api";
-import { DEFAULT_GARMENT, GARMENT_OPTIONS, LAYOUT_OPTIONS } from "@/lib/merch";
+import { LAYOUT_OPTIONS } from "@/lib/merch";
 import type { Drop, DropStatus, Trend } from "@/lib/types";
 
 const STATUS_STYLES: Record<DropStatus, string> = {
@@ -41,10 +41,10 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   const [quipDropped, setQuipDropped] = useState(0);
   const [generating, startGenerating] = useTransition();
   // Default rotates by trend id so consecutive cards don't all look identical.
+  // `trend.id` is a positive DB id; guard the modulo anyway so a bad id can't crash.
   const [layout, setLayout] = useState(
-    LAYOUT_OPTIONS[trend.id % LAYOUT_OPTIONS.length].value,
+    LAYOUT_OPTIONS[Math.abs(trend.id) % LAYOUT_OPTIONS.length].value,
   );
-  const [garment, setGarment] = useState(DEFAULT_GARMENT);
 
   // Adopt a newer drop coming from the server (e.g. after router.refresh()).
   useEffect(() => {
@@ -83,10 +83,7 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
     setError(null);
     startTransition(async () => {
       try {
-        const created = await api.submitDesign(trend.id, value, {
-          layout,
-          garmentColor: garment,
-        });
+        const created = await api.submitDesign(trend.id, value, { layout });
         // The line the operator actually shipped becomes house-voice for future
         // generations (best-effort, never blocks the submit).
         api.recordHallOfFame(value);
@@ -99,7 +96,11 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
   }
 
   function generate() {
+    // Clear any prior results so a failed retry can't leave stale quips + a stale
+    // "N filtered out" count sitting next to the new error.
     setQuipError(null);
+    setQuips([]);
+    setQuipDropped(0);
     startGenerating(async () => {
       try {
         const { quips: ideas, dropped } = await api.generateQuips(trend);
@@ -270,20 +271,6 @@ export function TrendCard({ trend, latestDrop }: { trend: Trend; latestDrop: Dro
             className="mt-1 min-h-[44px] rounded-lg border border-neutral-700 bg-neutral-950 px-2 text-sm normal-case text-neutral-200 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-500"
           >
             {LAYOUT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col text-[11px] uppercase tracking-wide text-neutral-500">
-          Garment
-          <select
-            value={garment}
-            onChange={(e) => setGarment(e.target.value)}
-            className="mt-1 min-h-[44px] rounded-lg border border-neutral-700 bg-neutral-950 px-2 text-sm normal-case text-neutral-200 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-500"
-          >
-            {GARMENT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

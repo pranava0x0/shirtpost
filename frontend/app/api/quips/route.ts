@@ -109,7 +109,17 @@ export async function POST(req: Request): Promise<NextResponse> {
   const generateCount = Math.min(20, Math.max(12, count * 3));
 
   const now = Date.now();
-  const cacheKey = JSON.stringify([term, count, ipRisk ?? false, context ?? ""]);
+  // Key on every input that changes the prompt, so two trends sharing a term but
+  // differing in angles/source/context don't serve each other's cached quips.
+  const cacheKey = JSON.stringify([
+    term,
+    source,
+    measurement,
+    count,
+    ipRisk ?? false,
+    context ?? "",
+    angles ?? [],
+  ]);
   const cached = quipCache.get(cacheKey);
   if (cached && now - cached.at < CACHE_TTL_MS) {
     return NextResponse.json(cached.body);
@@ -205,6 +215,15 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   const body = { quips: finalQuips, dropped };
-  quipCache.set(cacheKey, { at: now, body });
+  // Never cache an empty batch: the UI tells the operator to "try again", and a
+  // cached empty result would make that a no-op for the whole TTL. Only a real
+  // result is worth memoizing. Prune expired entries on write so the Map (keyed
+  // by every distinct trend) can't grow unbounded on a long-lived server.
+  if (finalQuips.length > 0) {
+    for (const [k, v] of quipCache) {
+      if (now - v.at >= CACHE_TTL_MS) quipCache.delete(k);
+    }
+    quipCache.set(cacheKey, { at: now, body });
+  }
   return NextResponse.json(body);
 }

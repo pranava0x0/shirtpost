@@ -14,9 +14,10 @@ const HALL_OF_FAME_PATH =
   process.env.HALL_OF_FAME_PATH ??
   path.join(process.cwd(), "..", "data", "copy", "hall-of-fame.json");
 
-// Keep the file bounded — the newest picks are the freshest voice. Display/use
-// samples from the tail; the file never grows without limit.
-const MAX_ENTRIES = 200;
+// Append-only record of shipped copy. Per CLAUDE.md ("Cap by content, not count")
+// we do NOT trim by count — that would silently drop the oldest real picks. The
+// generator samples only the newest few (see sampleAnchors); the file keeps
+// everything. One short line per shipped drop keeps growth trivially small.
 const MAX_LINE_CHARS = 80;
 
 /** Read the hall of fame as a string[]. Missing file or bad JSON => [] (the
@@ -46,7 +47,7 @@ export async function appendHallOfFame(copy: string): Promise<void> {
   if (!line || line.length > MAX_LINE_CHARS) return;
   const current = await readHallOfFame();
   if (current.some((c) => c.toLowerCase() === line.toLowerCase())) return; // already in
-  const next = [...current, line].slice(-MAX_ENTRIES);
+  const next = [...current, line];
   try {
     await fs.mkdir(path.dirname(HALL_OF_FAME_PATH), { recursive: true });
     await fs.writeFile(HALL_OF_FAME_PATH, `${JSON.stringify(next, null, 2)}\n`, "utf-8");
