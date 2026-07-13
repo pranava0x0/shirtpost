@@ -3,6 +3,18 @@
 Source: https://pranava0x0.github.io/vibe-coding-security/llms-ctx.txt
 Refresh if > 7 days old, or before any new dependency add / scaffold / CDN asset / GitHub Action / fetched install script.
 
+## Sweep 2026-07-12 — vitest test harness (v2 copy-gen work)
+
+Triggered by: adding `vitest` as a frontend devDependency for `quips.test.ts`
+(the deferred vitest harness, TRENDS-DISCOVERY-SPEC Part B). Advisory index
+re-fetched 2026-07-12.
+
+- **`vitest`** — NOT named in the index. Cleared. Pinned exact, lockfile-installed.
+- The only Vite-family entry is "Vite dev-server WebSocket arbitrary file read"
+  (advisory 2026-04-06) — it concerns an *exposed* `vite` dev server, not the
+  test runner, which we never expose. No action beyond pinning a current version.
+- No other index matches; prior notes below still stand.
+
 ## Sweep 2026-07-06 — quip generation moved to the Next.js server
 
 Triggered by: moving quip generation off FastAPI to a Next.js server route so the

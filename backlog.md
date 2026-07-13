@@ -3,17 +3,19 @@
 ## ⬆ Top priority — next up
 
 - **V2: trend-discovery cloud routine + fun overhaul** (priority: **high — top item**, added
-  2026-07-12). Full implementation plan in [docs/TRENDS-DISCOVERY-SPEC.md](docs/TRENDS-DISCOVERY-SPEC.md)
-  — plan only so far, nothing executed. The v1 audit found the radar surfaces attention
-  (news/pageviews), not wearable phrases; the meme seeds are stale 2021–23; quip gen is blind
-  one-shot Haiku with no judge, no context, no cliché ban; merch is one layout on one garment.
-  Execute in spec order: **T0** verify source contracts (X aggregators, Bluesky, Mastodon, KYM;
-  Reddit stance = owner decision; apply for Google Trends alpha now) → **T1** scheduled cloud
-  routine (daily sweep → judged JSONL → PR) + `discovered` radar adapter + `Trend.context` →
-  **Part B** copy v2 (generate→judge, Sonnet, cliché kill-list, hall-of-fame anchors) →
-  **Part C** merch layout/color variety → **T2** deterministic collectors. Absorbs the three
-  "Copy generation" follow-ups below (vitest harness, cache-by-term, `/api/quips` rate limit)
-  into Part B.
+  2026-07-12; **code parts shipped 2026-07-13**). Plan: [docs/TRENDS-DISCOVERY-SPEC.md](docs/TRENDS-DISCOVERY-SPEC.md).
+  - ✅ **T1** `discovered` radar adapter + `Trend.context`/`angles`/`ip_risk` + hype-bypass for
+    judged scores; `google_trends` RSS enabled. (See STATUS.md "V2 … shipped".)
+  - ✅ **Part B** copy v2 — generate (Sonnet, 4 angles, grounded) → judge (Haiku), cliché
+    kill-list + IP guard, hall-of-fame anchors, cache-by-term + rate limit, **vitest** harness.
+    (Absorbed the three old "Copy generation" follow-ups.)
+  - ✅ **Part C** merch variety — 4 render layouts + per-drop garment, exposed as Studio dropdowns.
+  - ⬜ **T0 (human-gated, do next):** verify each source contract by hand (X aggregators, KYM,
+    Bluesky, Mastodon), owner decides the Reddit stance, apply for the Google Trends alpha.
+  - ⬜ **Create the scheduled cloud routine** via `/schedule` with the A6 prompt (owner action —
+    it opens the daily discovery PRs the `discovered` adapter reads).
+  - ⬜ **T2** deterministic collectors (Bluesky/Mastodon/RSS → code) and **T3** feedback loop
+    (operator picks + X engagement → source weighting) — wait on T1 real runs + posting volume.
 
 ## Data access (deferred from Phase 1 scaffold decision)
 
@@ -116,7 +118,12 @@ The alternatives, if ever needed:
   hold the key on the backend. It would either run in a Next.js server route (like the quip
   generator) with FastAPI calling it, or move the whole trend-ingest safety gate server-side there.
 
-## Copy generation (shipped 2026-07-06)
+## Copy generation (shipped 2026-07-06; overhauled by v2 Part B 2026-07-13)
+
+> The v1 generator below was single-stage Haiku. **v2 Part B** replaced it with a
+> two-stage generate (Sonnet) → judge (Haiku) path grounded in the trend context,
+> with a cliché kill-list, IP guard, and hall-of-fame anchors. The default
+> `QUIP_MODEL` is now Sonnet. See the top backlog item + STATUS.md.
 
 - **Funny one-liner generator** — the Studio "Generate ideas" button asks Claude (Haiku by default,
   `QUIP_MODEL` for Sonnet) for a batch of banger shirt slogans riffed on a trend, family-safe
@@ -124,18 +131,14 @@ The alternatives, if ever needed:
   so `ANTHROPIC_API_KEY` lives with the dashboard server, never on the public FastAPI admin API
   (**done** — the owner's "no key on the backend" constraint). The operator still picks (model
   proposes, human disposes). Fails loud (503) with no key.
-- Follow-ups (priority: low): cache quips by trend term to avoid re-billing repeat clicks; a
-  regenerate/"more like this" control; let the operator tune the count from the UI.
-- **Rate-limit / gate `/api/quips`** (priority: medium). The route spends real Anthropic tokens per
-  call and has no auth or rate limit — anyone who can reach the dashboard can burn budget. Add a
-  simple per-IP/session limit (or fold it into the eventual dashboard auth). Pairs with the
-  cache-by-trend-term item above.
-- **Frontend test runner for `lib/quips.ts`** (priority: medium). The parse/family-filter/dedup/cap
-  logic is pure and safety-relevant but untested — the frontend has no test harness (its Python
-  predecessor did have tests, removed with the move). Add vitest (advisory-sweep it) + `quips.test.ts`
-  covering: fenced/malformed JSON, non-`{quips}` shape, `Pornhub` over-block, quote-stripping, dedup,
-  length cap, count cap. Deliberately deferred out of the merge to avoid bolting on a framework at the
-  last minute.
+- Follow-ups: ~~cache quips by trend term~~ (**done, v2 Part B** — in-process cache-by-term);
+  a regenerate/"more like this" control (priority: low); let the operator tune the count from
+  the UI (priority: low).
+- ~~**Rate-limit / gate `/api/quips`**~~ (**done, v2 Part B** — in-process sliding-window rate
+  limit on the route; a real per-session limit still folds into the eventual dashboard auth).
+- ~~**Frontend test runner for `lib/quips.ts`**~~ (**done, v2 Part B** — added `vitest`
+  (advisory-swept 2026-07-12) + `frontend/lib/quips.test.ts` (21 tests) covering
+  parse/family/cliché/IP/dedup/cap/anchor paths; `npm test`).
 - **Family blocklist is duplicated** (priority: low) across `backend/app/config.py` and
   `frontend/lib/quips.ts` (the output filter) — kept in sync by hand. A drift only over-blocks, but
   if it grows, expose one source (e.g. a backend `/config/family-blocklist` the route reads once).
