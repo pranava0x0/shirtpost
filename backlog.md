@@ -1,5 +1,20 @@
 # Backlog
 
+## ⬆ Top priority — next up
+
+- **V2: trend-discovery cloud routine + fun overhaul** (priority: **high — top item**, added
+  2026-07-12). Full implementation plan in [docs/TRENDS-DISCOVERY-SPEC.md](docs/TRENDS-DISCOVERY-SPEC.md)
+  — plan only so far, nothing executed. The v1 audit found the radar surfaces attention
+  (news/pageviews), not wearable phrases; the meme seeds are stale 2021–23; quip gen is blind
+  one-shot Haiku with no judge, no context, no cliché ban; merch is one layout on one garment.
+  Execute in spec order: **T0** verify source contracts (X aggregators, Bluesky, Mastodon, KYM;
+  Reddit stance = owner decision; apply for Google Trends alpha now) → **T1** scheduled cloud
+  routine (daily sweep → judged JSONL → PR) + `discovered` radar adapter + `Trend.context` →
+  **Part B** copy v2 (generate→judge, Sonnet, cliché kill-list, hall-of-fame anchors) →
+  **Part C** merch layout/color variety → **T2** deterministic collectors. Absorbs the three
+  "Copy generation" follow-ups below (vitest harness, cache-by-term, `/api/quips` rate limit)
+  into Part B.
+
 ## Data access (deferred from Phase 1 scaffold decision)
 
 The Phase 1 spec listed both SQLAlchemy (Python) and Prisma (Next.js) over one DB.
