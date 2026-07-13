@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.factory.render import DEFAULT_LAYOUT, LAYOUTS
 from app.models import DropStatus
 
 
@@ -20,6 +21,13 @@ class TrendOut(BaseModel):
     volume: int
     velocity: float
     hype_score: float
+    # Discovery enrichment, null for attention-based sources. `context` grounds the
+    # quip generator ("why this is trending"); `angles` are comedic-direction hints;
+    # `ip_risk` flags a term built on a real person/brand/franchise/lyric so the
+    # dashboard warns and the generator riffs around it. See TRENDS-DISCOVERY-SPEC.
+    context: str | None = None
+    angles: list[str] | None = None
+    ip_risk: bool | None = None
     # Hype relative to *its own source* (0..1, min-max over all trends of that
     # source). Volumes are NOT comparable across sources, so this is the honest
     # within-lane scale for a bar; never a cross-source ranking. 1.0 when a
@@ -52,6 +60,8 @@ class DropOut(BaseModel):
     id: int
     trend_id: int
     design_copy: str
+    layout: str | None
+    garment_color: str | None
     status: DropStatus
     error: str | None
     printful_mockup_url: str | None
@@ -69,3 +79,14 @@ class DesignSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     design_copy: str = Field(min_length=1, max_length=500)
+    # Merch variety (Part C). Both optional: layout defaults to "centered", and a
+    # null garment_color falls back to the config default at render time.
+    layout: str | None = None
+    garment_color: str | None = Field(default=None, max_length=64)
+
+    @field_validator("layout")
+    @classmethod
+    def _known_layout(cls, v: str | None) -> str | None:
+        if v is not None and v not in LAYOUTS:
+            raise ValueError(f"layout must be one of {LAYOUTS} (or omitted for {DEFAULT_LAYOUT})")
+        return v

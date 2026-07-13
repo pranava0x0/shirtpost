@@ -12,7 +12,8 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import feedparser
 from bs4 import BeautifulSoup
@@ -39,6 +40,11 @@ class RawTrend:
     source_url: str | None
     volume: int
     measurement: str  # what `volume` measures; NOT comparable across sources
+    # Discovery enrichment — populated only by the "discovered" source; None for
+    # every attention-based source (they have no shirt-worthiness judgment).
+    context: str | None = None
+    angles: list[str] | None = None
+    ip_risk: bool | None = None
 
 
 def clean_text(value: str) -> str:
@@ -177,6 +183,121 @@ def fetch_wikipedia() -> list[RawTrend]:
     return out
 
 
+def _parse_discovered_line(raw: str) -> dict | None:
+    """Parse one JSONL line into the fields the adapter needs, or None if it's
+    unusable (malformed JSON, missing term/shirt_score). Never raises — a bad line
+    is logged and skipped so it can't sink the sweep."""
+    try:
+        obj = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        logger.warning("discovered: skipping malformed JSONL line: %s", exc)
+        return None
+    if not isinstance(obj, dict):
+        logger.warning("discovered: skipping non-object JSONL line")
+        return None
+    term = clean_text(str(obj.get("term", "")))
+    if not term:
+        logger.warning("discovered: skipping line with empty term")
+        return None
+    score = obj.get("shirt_score")
+    if not isinstance(score, (int, float)):
+        logger.warning("discovered: skipping term=%r with non-numeric shirt_score", term)
+        return None
+    return {
+        "term": term,
+        "term_raw": str(obj.get("term_raw") or obj.get("term") or term),
+        "key": clean_text(str(obj.get("key") or term)).lower(),
+        "day": str(obj.get("day", "")),
+        "shirt_score": int(score),
+        "context": obj.get("context") or None,
+        "angles": obj.get("angles") if isinstance(obj.get("angles"), list) else None,
+        "ip_risk": bool(obj["ip_risk"]) if isinstance(obj.get("ip_risk"), bool) else None,
+        "source_url": _first_source_url(obj.get("sources")),
+    }
+
+
+def _first_source_url(sources: object) -> str | None:
+    """First non-empty `url` from the record's `sources` array, if any."""
+    if not isinstance(sources, list):
+        return None
+    for src in sources:
+        if isinstance(src, dict) and src.get("url"):
+            return str(src["url"])
+    return None
+
+
+def parse_discovered(body: str, *, window_days: int, today: date) -> list[RawTrend]:
+    """Parse the discovered JSONL into RawTrends. Keeps only lines whose `day` is
+    within the last `window_days` (bound by content, not count — the file itself is
+    never trimmed). Dedupes by `key`, keeping the row with the max `shirt_score`.
+
+    `volume` carries `shirt_score` under measurement ``shirt_score`` — an honest
+    volume for its own lane, since lanes never compare across sources. The worker
+    bypasses the velocity boost for this measurement (a judged score is already a
+    ranking; see worker.run_sweep_once)."""
+    cutoff = today - timedelta(days=window_days)
+    best: dict[str, dict] = {}
+    for line in body.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rec = _parse_discovered_line(line)
+        if rec is None:
+            continue
+        try:
+            day = date.fromisoformat(rec["day"])
+        except ValueError:
+            logger.warning("discovered: term=%r has unparseable day=%r — skipping", rec["term"], rec["day"])
+            continue
+        if day < cutoff or day > today:
+            continue  # outside the window (future days guarded too)
+        prev = best.get(rec["key"])
+        if prev is None or rec["shirt_score"] > prev["shirt_score"]:
+            best[rec["key"]] = rec
+    out = [
+        RawTrend(
+            term=rec["term"],
+            term_raw=rec["term_raw"],
+            source="discovered",
+            source_url=rec["source_url"],
+            volume=rec["shirt_score"],
+            measurement="shirt_score",
+            context=rec["context"],
+            angles=rec["angles"],
+            ip_risk=rec["ip_risk"],
+        )
+        for rec in best.values()
+    ]
+    return out
+
+
+def fetch_discovered() -> list[RawTrend]:
+    """Read the cloud-routine's append-only discovery file from the local checkout
+    and emit judged, shirt-worthy candidates. Missing/empty file logs a distinct
+    "no discovery data" warning (empty ≠ broken — the routine may simply not have
+    run yet), never a crash."""
+    settings = get_settings()
+    path = Path(settings.discovered_trends_path)
+    if not path.exists():
+        logger.warning(
+            "radar source=discovered no file at %s — no discovery data (routine not run yet?)",
+            path,
+        )
+        return []
+    try:
+        body = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("radar source=discovered could not read %s: %s", path, exc)
+        return []
+    if not body.strip():
+        logger.warning("radar source=discovered file %s is empty — no discovery data", path)
+        return []
+    today = datetime.now(timezone.utc).date()
+    out = parse_discovered(body, window_days=settings.discovered_window_days, today=today)
+    logger.info("radar source=discovered parsed=%d (window=%dd)", len(out), settings.discovered_window_days)
+    return out
+
+
 def is_family_safe(term: str, blocklist: list[str]) -> bool:
     """Cheap keyword gate: drop a trend if its term contains a blocklisted word.
 
@@ -203,6 +324,8 @@ def collect(source_ids: list[str]) -> list[RawTrend]:
                 results.extend(fetch_wikipedia())
             elif sid == "google_trends":
                 results.extend(fetch_rss("google_trends", settings.google_trends_rss_url))
+            elif sid == "discovered":
+                results.extend(fetch_discovered())
             else:
                 logger.warning("unknown radar source id=%s (skipping)", sid)
         except Exception as exc:

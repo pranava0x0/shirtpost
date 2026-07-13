@@ -175,7 +175,13 @@ def submit_design(
         raise HTTPException(
             status_code=409, detail="a drop for this trend is already in flight"
         )
-    drop = Drop(trend_id=trend.id, design_copy=body.design_copy, status=DropStatus.PENDING)
+    drop = Drop(
+        trend_id=trend.id,
+        design_copy=body.design_copy,
+        layout=body.layout,
+        garment_color=body.garment_color,
+        status=DropStatus.PENDING,
+    )
     session.add(drop)
     try:
         # Authoritative guard: the partial unique index rejects a concurrent

@@ -41,13 +41,21 @@ class Settings(BaseSettings):
     radar_enabled: bool = True
     radar_poll_interval_seconds: int = Field(default=900, ge=30)
     radar_sources: list[str] = Field(
-        default=["simulated"],
+        default=["simulated", "discovered", "google_trends"],
         # "wikipedia" is the ToS-clean real source (open pageviews API, no key).
-        # Reddit was dropped (its free API forbids commercial use). Google Trends
-        # has no sanctioned feed until the alpha API is granted — apply for it.
-        description='Enabled source ids: "simulated", "wikipedia", "google_trends".',
+        # "discovered" reads the cloud-routine's judged phrases from the local
+        # checkout (data/trends/discovered.jsonl — $0, no network). "google_trends"
+        # is the unofficial RSS (free signal until the alpha API is granted).
+        # Reddit was dropped (its free API forbids commercial use).
+        description='Enabled source ids: "simulated", "wikipedia", "google_trends", "discovered".',
     )
     google_trends_rss_url: str = "https://trends.google.com/trending/rss?geo=US"
+    # "discovered" source: the cloud trend-discovery routine appends judged,
+    # shirt-worthy phrases here by daily PR; the adapter reads them from the local
+    # checkout. Path is relative to the backend CWD (repo-root/data/...). See
+    # docs/TRENDS-DISCOVERY-SPEC.md Part A.
+    discovered_trends_path: str = "../data/trends/discovered.jsonl"
+    discovered_window_days: int = Field(default=14, ge=1, le=90)
     # Wikipedia most-viewed articles — free, open, ToS-clean. Date is appended as
     # /YYYY/MM/DD at fetch time (data lags ~1 day, so the radar reads yesterday).
     wikipedia_top_api: str = (
