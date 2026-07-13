@@ -9,6 +9,12 @@ export type Trend = {
   volume: number;
   velocity: number;
   hype_score: number;
+  // Discovery enrichment (from the "discovered" source); null for attention-based
+  // sources. context = why it's trending (grounds the quip generator), angles =
+  // comedic-direction hints, ip_risk = built on a real person/brand/lyric.
+  context: string | null;
+  angles: string[] | null;
+  ip_risk: boolean | null;
   // Hype relative to its own source (0..1). Volumes are not comparable across
   // sources, so this is a within-lane scale only — never a cross-source rank.
   normalized_hype: number;
@@ -34,6 +40,9 @@ export type Drop = {
   id: number;
   trend_id: number;
   design_copy: string;
+  // Merch variety: render template + garment override (null => defaults).
+  layout: string | null;
+  garment_color: string | null;
   status: DropStatus;
   error: string | null;
   printful_mockup_url: string | null;
